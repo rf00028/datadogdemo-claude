@@ -12,21 +12,17 @@ try {
   });
 } catch{}
 
-const API_KEY = process.env.DD_API_KEY;
-const APP_KEY = process.env.DD_APP_KEY;
-const SITE    = process.env.DD_SITE || 'datadoghq.com';
-const ENV_TAG = process.env.DD_ENV  || 'local';
+const CUSTOMER = require('./app/customer.config');
+const API_KEY  = process.env.DD_API_KEY;
+const APP_KEY  = process.env.DD_APP_KEY;
+const SITE     = process.env.DD_SITE || 'datadoghq.com';
+const SERVICE  = CUSTOMER.platform;
+const SVC_PFX  = CUSTOMER.servicePrefix;
+const ENV_TAG  = process.env.DD_ENV  || 'local';
 
 if (!API_KEY||!APP_KEY){ console.error('DD_API_KEY and DD_APP_KEY required'); process.exit(1); }
 
-const BRANDS = [
-  { key:'arbys',          name:"Arby's",          team:'arbys-ops',    color:'#E31837', channels:['drive-thru','in-store','delivery'] },
-  { key:'bww',            name:'Buffalo Wild Wings',team:'bww-ops',    color:'#F5A800', channels:['dine-in','takeout','delivery'] },
-  { key:'sonic',          name:'Sonic Drive-In',   team:'sonic-ops',   color:'#005FA3', channels:['drive-in','drive-thru','delivery'] },
-  { key:'dunkin',         name:"Dunkin'",           team:'dunkin-ops',  color:'#FF671F', channels:['in-store','drive-thru','mobile-order'] },
-  { key:'baskin-robbins', name:'Baskin-Robbins',    team:'br-ops',      color:'#E8256A', channels:['in-store','online','catering'] },
-  { key:'jimmy-johns',    name:"Jimmy John's",      team:'jj-ops',      color:'#C8102E', channels:['in-store','delivery','catering'] },
-];
+const BRANDS = CUSTOMER.brands;
 
 const ASSETS_PATH = path.join(__dirname,'app','public','dd-assets.json');
 
@@ -62,8 +58,8 @@ async function createRumApps() {
   const rumMap = {};
 
   const appsToCreate = [
-    ...BRANDS.map(b => ({ key: b.key, name: `Inspire ${b.name} Web`, service: `inspire-${b.key}-web` })),
-    { key: 'global', name: 'Inspire Brands Global Portal', service: 'inspire-global-web' },
+    ...BRANDS.map(b => ({ key: b.key, name: `${CUSTOMER.company} ${b.name} Web`, service: `${SVC_PFX}-${b.key}-web` })),
+    { key: 'global', name: `${CUSTOMER.company} Global Portal`, service: `${SVC_PFX}-global-web` },
   ];
 
   for (const app of appsToCreate) {
@@ -104,7 +100,7 @@ async function createBrandSynthetics() {
       name: `[${b.name}] Web App — Menu Load & Order Flow`,
       brand: b,
     })),
-    { key: 'global', name: '[Inspire] Global Portal — Brand Grid Load', brand: null },
+    { key: 'global', name: `[${CUSTOMER.company}] Global Portal — Brand Grid Load`, brand: null },
   ];
 
   for (const s of synths) {
@@ -119,16 +115,16 @@ async function createBrandSynthetics() {
       status: 'live',
       locations: ['aws:us-east-1'],
       tags: isGlobal
-        ? ['service:inspire-brands-platform','env:local','team:inspire-platform']
-        : [`brand:${s.key}`,`team:${s.brand.team}`,'service:inspire-brands-platform','env:local'],
+        ? [`service:${SERVICE}`,'env:local',`team:${CUSTOMER.platformTeam}`]
+        : [`brand:${s.key}`,`team:${s.brand.team}`,`service:${SERVICE}`,'env:local'],
       message: isGlobal
-        ? '🔴 Inspire Global Portal is failing! Check the platform at http://localhost:3000/inspire\n\n@platform-oncall'
+        ? `🔴 ${CUSTOMER.company} Global Portal is failing! Check the platform at http://localhost:3000/inspire\n\n@platform-oncall`
         : `🔴 **${s.brand?.name}** web app is failing!\n\nCheck brand web app: http://localhost:3000/brands/${s.key}\nBrand dashboard: https://app.datadoghq.com/dashboard\n\n@${s.brand?.team}`,
       config: {
         steps: [
           // Step 1: Load the web app (should always 200)
           {
-            name:    isGlobal ? 'Load Inspire Portal' : `Load ${s.brand?.name} Web App`,
+            name:    isGlobal ? `Load ${CUSTOMER.company} Portal` : `Load ${s.brand?.name} Web App`,
             subtype: 'http',
             request: {
               method: 'GET',
@@ -238,7 +234,7 @@ async function addRumWidgetsToDashboards(rumMap) {
 
   for (const brand of BRANDS) {
     const dashId  = DASH_IDS[brand.key];
-    const service = `inspire-${brand.key}-web`;
+    const service = `${SVC_PFX}-${brand.key}-web`;
 
     // GET dashboard
     const get = await ddRequest('GET', `/api/v1/dashboard/${dashId}`);
@@ -391,15 +387,8 @@ async function writeAssets(rumMap, synthIds) {
   assets.rum       = rumMap;
   assets.synthRum  = synthIds;
 
-  // Add brand logo URLs for the brand apps
-  assets.brandLogoUrls = {
-    arbys:           'https://inspirebrands.com/wp-content/uploads/2017/10/Arbys.jpg',
-    bww:             'https://inspirebrands.com/wp-content/uploads/2018/08/Buffalo-Wild-Wings-Logo-Horizontal.jpg',
-    sonic:           'https://inspirebrands.com/wp-content/uploads/2020/02/Sonic_Logo-1-scaled.jpg',
-    dunkin:          'https://inspirebrands.com/wp-content/uploads/2021/06/Dunkin_Donuts_logo.png',
-    'baskin-robbins':'https://inspirebrands.com/wp-content/uploads/2022/04/IB_BROnlineStamp-01.png',
-    'jimmy-johns':   'https://inspirebrands.com/wp-content/uploads/2023/10/JJ-Red-2.png',
-  };
+  // Add brand logo URLs for the brand apps — sourced from customer.config
+  assets.brandLogoUrls = CUSTOMER.brandLogoUrls || {};
 
   fs.writeFileSync(ASSETS_PATH, JSON.stringify(assets, null, 2));
   console.log('  ✓ dd-assets.json updated with RUM configs');

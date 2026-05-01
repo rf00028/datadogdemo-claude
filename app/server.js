@@ -1,6 +1,8 @@
+const CUSTOMER = require('./customer.config');
+
 // dd-trace MUST be initialized before any other requires
 const tracer = require('dd-trace').init({
-  service: 'inspire-brands-platform',
+  service: CUSTOMER.platform,
   env: process.env.DD_ENV || 'local',
   version: process.env.DD_VERSION || '1.0.0',
   logInjection: true,
@@ -23,7 +25,7 @@ let   Anthropic     = null;
 
 // Enable LLMObs — guard in case dd-trace version doesn't export it
 if (LLMObs && typeof LLMObs.enable === 'function') {
-  LLMObs.enable({ mlApp: 'inspire-brands-assistant', agentlessEnabled: false });
+  LLMObs.enable({ mlApp: CUSTOMER.mlApp, agentlessEnabled: false });
 }
 
 if (ANTHROPIC_KEY) {
@@ -51,8 +53,8 @@ const logTransports = [new winston.transports.Console()];
 if (process.env.DD_API_KEY) {
   logTransports.push(new DatadogWinston({
     apiKey:   process.env.DD_API_KEY,
-    hostname: 'inspire-demo-host',
-    service:  'inspire-brands-platform',
+    hostname: CUSTOMER.hostname,
+    service:  CUSTOMER.platform,
     ddsource: 'nodejs',
     ddtags:   DD_BASE_TAGS,
   }));
@@ -68,98 +70,13 @@ const logger = winston.createLogger({
 const dogstatsd = new StatsD({
   host:       process.env.DD_AGENT_HOST || 'datadog-agent',
   port:       8125,
-  prefix:     'inspire.',
-  globalTags: [`env:${process.env.DD_ENV || 'local'}`, 'service:inspire-brands-platform'],
+  prefix:     CUSTOMER.metricPrefix + '.',
+  globalTags: [`env:${process.env.DD_ENV || 'local'}`, `service:${CUSTOMER.platform}`],
   errorHandler: (err) => logger.warn('StatsD error', { error: err.message }),
 });
 
 // ── Brand Configuration ───────────────────────────────────
-const BRANDS = {
-  arbys: {
-    name: "Arby's",
-    color: '#E31837',
-    team: 'arbys-ops',
-    tagline: "We Have The Meats",
-    channels: ['drive-thru', 'in-store', 'delivery'],
-    menu: [
-      { id: 1, name: 'Roast Beef Classic',  price: 5.99,  category: 'sandwiches' },
-      { id: 2, name: 'Beef & Cheddar',      price: 6.99,  category: 'sandwiches' },
-      { id: 3, name: 'Curly Fries Large',   price: 2.99,  category: 'sides'      },
-      { id: 4, name: 'Mozzarella Sticks',   price: 4.99,  category: 'sides'      },
-      { id: 5, name: 'Jamocha Shake',       price: 3.99,  category: 'drinks'     },
-    ],
-  },
-  bww: {
-    name: 'Buffalo Wild Wings',
-    color: '#F5A800',
-    team: 'bww-ops',
-    tagline: "Wings. Beer. Sports.",
-    channels: ['dine-in', 'takeout', 'delivery'],
-    menu: [
-      { id: 1, name: 'Traditional Wings 6pc', price: 9.99,  category: 'wings'      },
-      { id: 2, name: 'Boneless Wings 6pc',    price: 8.99,  category: 'wings'      },
-      { id: 3, name: 'Street Tacos',           price: 11.99, category: 'entrees'    },
-      { id: 4, name: 'Loaded Nachos',          price: 10.99, category: 'shareables' },
-      { id: 5, name: 'Draft Beer',             price: 6.99,  category: 'drinks'     },
-    ],
-  },
-  sonic: {
-    name: 'Sonic Drive-In',
-    color: '#005FA3',
-    team: 'sonic-ops',
-    tagline: "America's Drive-In",
-    channels: ['drive-in', 'drive-thru', 'delivery'],
-    menu: [
-      { id: 1, name: 'Footlong Coney',      price: 4.99, category: 'hot-dogs' },
-      { id: 2, name: 'SONIC Blast',          price: 4.49, category: 'desserts' },
-      { id: 3, name: 'Tots Large',           price: 2.99, category: 'sides'    },
-      { id: 4, name: 'Route 44 Drink',       price: 2.49, category: 'drinks'   },
-      { id: 5, name: 'Double Cheeseburger',  price: 5.99, category: 'burgers'  },
-    ],
-  },
-  dunkin: {
-    name: "Dunkin'",
-    color: '#FF671F',
-    team: 'dunkin-ops',
-    tagline: "America Runs on Dunkin'",
-    channels: ['in-store', 'drive-thru', 'mobile-order'],
-    menu: [
-      { id: 1, name: 'Medium Hot Coffee',    price: 2.49, category: 'coffee'     },
-      { id: 2, name: 'Cold Brew',             price: 3.99, category: 'coffee'     },
-      { id: 3, name: 'Glazed Donut',          price: 1.29, category: 'donuts'     },
-      { id: 4, name: 'Bacon Egg & Cheese',    price: 4.99, category: 'sandwiches' },
-      { id: 5, name: 'Munchkins 10pk',        price: 3.99, category: 'donuts'     },
-    ],
-  },
-  'baskin-robbins': {
-    name: 'Baskin-Robbins',
-    color: '#E8256A',
-    team: 'br-ops',
-    tagline: "31 Flavors of Fun",
-    channels: ['in-store', 'online', 'catering'],
-    menu: [
-      { id: 1, name: 'Single Scoop',       price: 3.49,  category: 'scoops'  },
-      { id: 2, name: 'Double Scoop',        price: 4.99,  category: 'scoops'  },
-      { id: 3, name: 'Sundae',              price: 5.99,  category: 'sundaes' },
-      { id: 4, name: 'Milkshake',           price: 6.49,  category: 'drinks'  },
-      { id: 5, name: 'Ice Cream Cake (8")', price: 24.99, category: 'cakes'   },
-    ],
-  },
-  'jimmy-johns': {
-    name: "Jimmy John's",
-    color: '#C8102E',
-    team: 'jj-ops',
-    tagline: "Freaky Fast Delivery",
-    channels: ['in-store', 'delivery', 'catering'],
-    menu: [
-      { id: 1, name: '#1 Pepe',                price: 8.99, category: 'sandwiches'      },
-      { id: 2, name: '#6 The Veggie',           price: 8.49, category: 'sandwiches'      },
-      { id: 3, name: '#9 Italian Night Club',   price: 9.99, category: 'sandwiches'      },
-      { id: 4, name: 'Slim 1 Ham & Cheese',     price: 7.49, category: 'slim-sandwiches' },
-      { id: 5, name: 'Chocolate Chip Cookie',   price: 1.29, category: 'sides'           },
-    ],
-  },
-};
+const BRANDS = Object.fromEntries(CUSTOMER.brands.map(b => [b.key, b]));
 
 const BRAND_KEYS = Object.keys(BRANDS);
 
@@ -271,7 +188,7 @@ app.get('/health', (req, res) => {
   dogstatsd.gauge('platform.up', 1);
   res.json({
     status:    'ok',
-    service:   'inspire-brands-platform',
+    service:   CUSTOMER.platform,
     brands:    BRAND_KEYS.length,
     timestamp: new Date().toISOString(),
   });
@@ -341,7 +258,7 @@ app.post('/api/:brand/orders', async (req, res) => {
 
   // Child span with brand-specific service name — surfaces as a separate APM service
   await tracer.trace('pos.create_order', {
-    service:  `inspire-${brand}-pos`,
+    service:  `${CUSTOMER.servicePrefix}-${brand}-pos`,
     resource: `POST /api/${brand}/orders`,
     type:     'web',
   }, async (span) => {
@@ -413,9 +330,9 @@ app.get('/api/:brand/loyalty/:userId', async (req, res) => {
   tagBrand(brand);
   brandMetrics[brand].loyaltyLookups++;
 
-  // Child span surfaces as inspire-{brand}-loyalty in APM service map
+  // Child span surfaces as {servicePrefix}-{brand}-loyalty in APM service map
   await tracer.trace('loyalty.member_lookup', {
-    service:  `inspire-${brand}-loyalty`,
+    service:  `${CUSTOMER.servicePrefix}-${brand}-loyalty`,
     resource: `GET /api/${brand}/loyalty/:userId`,
     type:     'web',
   }, async (span) => {
@@ -458,9 +375,9 @@ app.get('/api/:brand/delivery/estimate', async (req, res) => {
   const surge = evalFlag('delivery-surge');
   tagBrand(brand);
 
-  // Child span surfaces as inspire-{brand}-delivery in APM service map
+  // Child span surfaces as {servicePrefix}-{brand}-delivery in APM service map
   await tracer.trace('delivery.get_estimate', {
-    service:  `inspire-${brand}-delivery`,
+    service:  `${CUSTOMER.servicePrefix}-${brand}-delivery`,
     resource: `GET /api/${brand}/delivery/estimate`,
     type:     'web',
   }, async (span) => {
@@ -583,34 +500,41 @@ function buildSystemPrompt() {
     FLAGS['delivery-surge'].enabled   ? '  ⚠️  delivery-surge: ON — 3× ETAs across all brands' : null,
   ].filter(Boolean).join('\n');
 
-  return `You are the Inspire Brands Digital Operations Assistant — an AI embedded in the live Datadog observability demo platform.
+  const svcPfx     = CUSTOMER.servicePrefix;
+  const brandCount = BRAND_KEYS.length;
+  const svcCount   = 1 + brandCount * 3;
+  const monCount   = brandCount * 3 + 3;
+  const brandList  = BRAND_KEYS.map(k => BRANDS[k].name).join(', ');
+  const teamList   = BRAND_KEYS.map(k => BRANDS[k].team).join(', ');
+
+  return `You are the ${CUSTOMER.company} Digital Operations Assistant — an AI embedded in the live Datadog observability demo platform.
 
 CURRENT PLATFORM STATUS:
 ${brandStatus}
 ${extras || '  ✅ No active incidents'}
 
 PLATFORM ARCHITECTURE:
-- 6 brands: Arby's, Buffalo Wild Wings, Sonic Drive-In, Dunkin', Baskin-Robbins, Jimmy John's
-- Each brand has a dedicated Datadog team (arbys-ops, bww-ops, sonic-ops, dunkin-ops, br-ops, jj-ops)
-- 3 APM services per brand: inspire-{brand}-pos, inspire-{brand}-loyalty, inspire-{brand}-delivery
-- 19 services total in the Datadog Service Catalog with team ownership
-- 21 monitors: 3 per brand (POS errors, POS p95 latency, order volume anomaly) + 3 cross-brand
-- 7 synthetic tests: platform health check + POS order test per brand
+- ${brandCount} brands: ${brandList}
+- Each brand has a dedicated Datadog team (${teamList})
+- 3 APM services per brand: ${svcPfx}-{brand}-pos, ${svcPfx}-{brand}-loyalty, ${svcPfx}-{brand}-delivery
+- ${svcCount} services total in the Datadog Service Catalog with team ownership
+- ${monCount} monitors: 3 per brand (POS errors, POS p95 latency, order volume anomaly) + 3 cross-brand
+- ${1 + brandCount} synthetic tests: platform health check + POS order test per brand
 - Unified tagging: brand:, team:, channel:, env:, service:
 
 DATADOG FEATURES IN THIS DEMO:
 - Teams: Brand-level ownership and alert routing — each brand's monitors alert to its team
-- APM Service Map: Shows 19 services with parent-child relationships by brand
+- APM Service Map: Shows ${svcCount} services with parent-child relationships by brand
 - Service Catalog: Full service registry with team ownership, descriptions, and dashboard links
 - Monitors: Per-brand POS health + cross-brand shared-service monitors
 - Synthetics: Automated order placement tests per brand
 - Log Management: Structured logs tagged by brand and team, searchable in real time
-- LLM Observability: This very conversation is being traced in Datadog! (ml_app: inspire-brands-assistant)
+- LLM Observability: This very conversation is being traced in Datadog! (ml_app: ${CUSTOMER.mlApp})
 
 DEMO SCENARIOS (available in the UI):
 - POS Outage (per brand): toggle flag → 503 errors → POS error monitor fires → routes to brand team
 - Slow POS (per brand): toggle flag → 3× latency → p95 monitor fires
-- Loyalty Degraded (all brands): shared service failure impacting all 6 brands simultaneously
+- Loyalty Degraded (all brands): shared service failure impacting all ${brandCount} brands simultaneously
 - Delivery Surge (all brands): 3× ETAs → delivery SLO monitor fires
 
 Be conversational, specific, and demo-ready. Reference exact Datadog URLs and features when helpful. Keep answers to 2-4 sentences unless a longer explanation is needed.`;
@@ -618,8 +542,13 @@ Be conversational, specific, and demo-ready. Reference exact Datadog URLs and fe
 
 // ── Smart mock — context-aware responses from live state ──
 function mockResponse(message) {
-  const q   = message.toLowerCase();
-  const now = new Date().toLocaleTimeString();
+  const q          = message.toLowerCase();
+  const now        = new Date().toLocaleTimeString();
+  const svcPfx     = CUSTOMER.servicePrefix;
+  const brandCount = BRAND_KEYS.length;
+  const svcCount   = 1 + brandCount * 3;
+  const monCount   = brandCount * 3 + 3;
+  const brandList  = BRAND_KEYS.map(k => BRANDS[k].name).join(', ');
 
   const liveStatus = BRAND_KEYS.map(key => {
     const b = BRANDS[key];
@@ -640,49 +569,49 @@ function mockResponse(message) {
   }
 
   if (q.includes('team') || q.includes('ownership') || q.includes('routing')) {
-    return `Datadog Teams gives each brand its own operational identity. The platform has **7 teams**: \`inspire-platform\` for shared infrastructure, plus one per brand — \`arbys-ops\`, \`bww-ops\`, \`sonic-ops\`, \`dunkin-ops\`, \`br-ops\`, and \`jj-ops\`.\n\nEvery monitor is tagged \`team:<brand>-ops\`, so alerts route directly to the right team's Slack channel. A Sonic POS error never lands in the Dunkin' queue. The Service Catalog also maps all 19 APM services to their owning team, so there's no ambiguity about who's on-call for what.`;
+    const teamHandles = BRAND_KEYS.map(k => `\`${BRANDS[k].team}\``).join(', ');
+    return `Datadog Teams gives each brand its own operational identity. The platform has **${brandCount + 1} teams**: \`${CUSTOMER.platformTeam}\` for shared infrastructure, plus one per brand — ${teamHandles}.\n\nEvery monitor is tagged \`team:<brand>-ops\`, so alerts route directly to the right team's Slack channel. The Service Catalog maps all ${svcCount} APM services to their owning team, so there's no ambiguity about who's on-call for what.`;
   }
 
   if (q.includes('outage') || q.includes('trigger') || q.includes('incident') || q.includes('simulate')) {
-    const targetBrand = BRAND_KEYS.find(k => q.includes(k) || q.includes(BRANDS[k].name.toLowerCase())) || 'sonic';
-    const b = BRANDS[targetBrand];
-    return `When you trigger a **${b.name} POS outage** using the demo panel, the \`${targetBrand}-pos-outage\` feature flag flips to \`true\`. All POST /api/${targetBrand}/orders calls immediately return **HTTP 503**, and the DogStatsD metric \`inspire.pos.errors{brand:${targetBrand}}\` starts climbing.\n\nWithin ~30 seconds, the monitor **[${b.name}] POS Error Rate > 5 errors in 5m** fires. The alert routes to \`${b.team}\` with the triage runbook already embedded in the notification. You can watch the error spike live in the [${b.name} dashboard](https://app.datadoghq.com/dashboard/${BRANDS[targetBrand] ? Object.entries({"arbys":"f75-z6m-tar","bww":"q5d-bjs-bse","sonic":"nxt-4cb-fca","dunkin":"yd2-vab-79j","baskin-robbins":"mu7-y5j-aw3","jimmy-johns":"tap-3s5-x26"})[BRAND_KEYS.indexOf(targetBrand)]?.[1] : "3t7-6rx-4xc"}) and in APM under \`inspire-${targetBrand}-pos\`.`;
+    const targetKey = BRAND_KEYS.find(k => q.includes(k) || q.includes(BRANDS[k].name.toLowerCase())) || BRAND_KEYS[0];
+    const b = BRANDS[targetKey];
+    return `When you trigger a **${b.name} POS outage** using the demo panel, the \`${targetKey}-pos-outage\` feature flag flips to \`true\`. All POST /api/${targetKey}/orders calls immediately return **HTTP 503**, and the DogStatsD metric \`${svcPfx}.pos.errors{brand:${targetKey}}\` starts climbing.\n\nWithin ~30 seconds, the monitor **[${b.name}] POS Error Rate > 5 errors in 5m** fires. The alert routes to \`${b.team}\` with the triage runbook already embedded in the notification.`;
   }
 
   if (q.includes('tag') || q.includes('tagging') || q.includes('unified service')) {
-    return `The platform uses **Datadog Unified Service Tagging** across every signal:\n\n• \`service:inspire-brands-platform\` — the top-level service\n• \`brand:<key>\` — e.g. \`brand:sonic\`, \`brand:dunkin\`\n• \`team:<brand>-ops\` — ownership tag for alert routing\n• \`channel:<channel>\` — e.g. \`channel:drive-thru\`, \`channel:delivery\`\n• \`env:local\` + \`version:1.0.0\` — standard UST tags\n\nAll metrics, logs, and APM traces carry the same tag set, which means you can pivot from a log error → correlated trace → owning team without any manual correlation. That's the power of consistent tagging at ingestion time.`;
+    return `The platform uses **Datadog Unified Service Tagging** across every signal:\n\n• \`service:${CUSTOMER.platform}\` — the top-level service\n• \`brand:<key>\` — e.g. \`brand:${BRAND_KEYS[0]}\`, \`brand:${BRAND_KEYS[1]}\`\n• \`team:<brand>-ops\` — ownership tag for alert routing\n• \`channel:<channel>\` — e.g. \`channel:drive-thru\`, \`channel:delivery\`\n• \`env:local\` + \`version:1.0.0\` — standard UST tags\n\nAll metrics, logs, and APM traces carry the same tag set, which means you can pivot from a log error → correlated trace → owning team without any manual correlation.`;
   }
 
   if (q.includes('monitor') || q.includes('alert') || q.includes('slo')) {
-    return `The platform has **21 monitors** across 3 categories:\n\n**Per-brand (18 monitors):** Each of the 6 brands has:\n• POS Error Rate > 5 errors/5min (P2)\n• POS p95 Latency > 1500ms (P3)\n• Anomalous Order Volume — anomaly detection (P3)\n\n**Cross-brand (3 monitors):**\n• Platform-Wide Error Rate > 20 HTTP 500s/5min (P1)\n• Loyalty Service Errors > 10/5min — impacts all 6 brands (P2)\n• Delivery ETA p95 > 60 minutes (P2)\n\nAll monitors now have embedded **runbooks, Slack routing, PagerDuty escalation paths**, and brand-specific triage steps. There are also **6 SLOs** — one availability SLO per brand with 99.5% / 7d and 99.0% / 30d targets.`;
+    return `The platform has **${monCount} monitors** across 3 categories:\n\n**Per-brand (${brandCount * 3} monitors):** Each of the ${brandCount} brands has:\n• POS Error Rate > 5 errors/5min (P2)\n• POS p95 Latency > 1500ms (P3)\n• Anomalous Order Volume — anomaly detection (P3)\n\n**Cross-brand (3 monitors):**\n• Platform-Wide Error Rate > 20 HTTP 500s/5min (P1)\n• Loyalty Service Errors > 10/5min — impacts all ${brandCount} brands (P2)\n• Delivery ETA p95 > 60 minutes (P2)\n\nAll monitors have embedded runbooks, Slack routing, and brand-specific triage steps.`;
   }
 
   if (q.includes('apm') || q.includes('service map') || q.includes('trace') || q.includes('service')) {
-    return `APM shows **19 services** in the service map. The platform service \`inspire-brands-platform\` is the parent, with 3 child services per brand: \`inspire-<brand>-pos\`, \`inspire-<brand>-loyalty\`, and \`inspire-<brand>-delivery\`.\n\nEach brand's services are separated using \`tracer.trace()\` with a custom \`service:\` override — so Sonic's POS errors never inflate Dunkin's error rate. In the APM Service Map you'll see the 6 brands fanning out from the platform with clear parent-child relationships and latency/error indicators per service.`;
+    return `APM shows **${svcCount} services** in the service map. The platform service \`${CUSTOMER.platform}\` is the parent, with 3 child services per brand: \`${svcPfx}-<brand>-pos\`, \`${svcPfx}-<brand>-loyalty\`, and \`${svcPfx}-<brand>-delivery\`.\n\nEach brand's services are separated using \`tracer.trace()\` with a custom \`service:\` override — so one brand's POS errors never inflate another's error rate. In the APM Service Map you'll see the ${brandCount} brands fanning out from the platform with clear parent-child relationships.`;
   }
 
   if (q.includes('log') || q.includes('logging')) {
-    return `Every API call emits a structured JSON log with \`brand\`, \`team\`, \`trace_id\`, and \`duration_ms\` fields. Logs are shipped directly to Datadog via \`datadog-winston\`, correlated with APM traces via log injection.\n\nIn Log Management, you can filter by \`brand:sonic\` to see only Sonic's logs, or by \`status:error\` + \`brand:arbys\` to investigate Arby's errors in isolation. The Log Flood button in the demo UI sends a burst of realistic mixed-level logs across all brands — great for demonstrating log search and faceting.`;
+    return `Every API call emits a structured JSON log with \`brand\`, \`team\`, \`trace_id\`, and \`duration_ms\` fields. Logs are shipped directly to Datadog via \`datadog-winston\`, correlated with APM traces via log injection.\n\nIn Log Management, filter by \`brand:${BRAND_KEYS[0]}\` to see only ${BRANDS[BRAND_KEYS[0]].name}'s logs. The Log Flood button sends a burst of realistic mixed-level logs across all brands — great for demonstrating log search and faceting.`;
   }
 
   if (q.includes('loyalty') || q.includes('delivery') || q.includes('shared service')) {
-    return `Loyalty and Delivery are **shared services** — they span all 6 brands. When you toggle **Loyalty Degraded**, all brands simultaneously experience a 40% lookup failure rate and 4× latency, because they all call the same \`inspire-<brand>-loyalty\` APM services backed by the same upstream.\n\nThis is a great demo for showing how a single shared service failure cascades across an entire brand portfolio — and why the Loyalty monitor is tagged at the platform level rather than per-brand. The cross-brand monitor fires once, not 6 times.`;
+    return `Loyalty and Delivery are **shared services** — they span all ${brandCount} brands. When you toggle **Loyalty Degraded**, all brands simultaneously experience a 40% lookup failure rate and 4× latency, because they all call the same \`${svcPfx}-<brand>-loyalty\` APM services backed by the same upstream.\n\nThis demonstrates how a single shared service failure cascades across an entire brand portfolio — and why the Loyalty monitor fires once at the platform level rather than ${brandCount} times.`;
   }
 
   if (q.includes('cost') || q.includes('spend') || q.includes('usage') || q.includes('budget')) {
-    return `The Global Operations Dashboard includes a **Cost & Observability Spend** section showing:\n\n• Datadog estimated log ingestion bytes over time\n• Custom metric count trends\n• A derived Cost/Order metric — infrastructure spend normalized by order volume\n\nFor full cost allocation by brand/team, go to [Cloud Cost Management](https://app.datadoghq.com/cost/summary). Because every metric is tagged \`team:<brand>-ops\`, you can filter costs by team to see per-brand observability spend — great for internal chargeback conversations.`;
+    return `The Global Operations Dashboard includes a **Cost & Observability Spend** section showing log ingestion trends, custom metric counts, and a derived Cost/Order metric — infrastructure spend normalized by order volume.\n\nFor full cost allocation by brand/team, go to [Cloud Cost Management](https://app.datadoghq.com/cost/summary). Because every metric is tagged \`team:<brand>-ops\`, you can filter costs by team to see per-brand observability spend.`;
   }
 
   if (q.includes('data') || q.includes('pipeline') || q.includes('quality') || q.includes('freshness')) {
-    return `The platform emits **Data Observability metrics** every 15 seconds per brand:\n\n• \`inspire.data.quality_score\` — 0–100, degrades automatically during POS outages\n• \`inspire.data.menu_sync_age_seconds\` — cycles every ~5 minutes, alerts if stale >4 min\n• \`inspire.data.inventory_lag_ms\` — inventory sync latency with realistic jitter\n• \`inspire.data.pipeline_queue_depth\` — surges 3× during Delivery Surge scenarios\n\nAll of these are visible in the **Global Operations Dashboard** under the Data Pipeline Observability section.`;
+    return `The platform emits **Data Observability metrics** every 15 seconds per brand:\n\n• \`${svcPfx}.data.quality_score\` — 0–100, degrades automatically during POS outages\n• \`${svcPfx}.data.menu_sync_age_seconds\` — cycles every ~5 minutes, alerts if stale >4 min\n• \`${svcPfx}.data.inventory_lag_ms\` — inventory sync latency with realistic jitter\n• \`${svcPfx}.data.pipeline_queue_depth\` — surges 3× during Delivery Surge scenarios`;
   }
 
   if (q.includes('synthetic') || q.includes('synthetics')) {
-    return `There are **7 synthetic tests** running: one platform health check on GET /health, plus one POS order test per brand that sends a real POST /api/<brand>/orders request every few minutes.\n\nWhen a POS outage flag is active, the synthetic immediately starts failing and the synthetic alert fires — giving you a true end-to-end availability signal that's independent of metrics. In the demo you'll see synthetics flip from 🟢 to 🔴 within one test cycle of toggling a POS outage.`;
+    return `There are **${1 + brandCount} synthetic tests** running: one platform health check on GET /health, plus one POS order test per brand that places a real POST /api/<brand>/orders request every few minutes.\n\nWhen a POS outage flag is active, the synthetic immediately starts failing — giving you a true end-to-end availability signal independent of metrics.`;
   }
 
-  // Generic fallback
-  return `Great question about the Inspire Brands platform! This demo spans **6 brands** (Arby's, Buffalo Wild Wings, Sonic, Dunkin', Baskin-Robbins, Jimmy John's) with full Datadog coverage: APM (19 services), 21 monitors with P1–P3 triage runbooks, 6 brand SLOs, synthetics, structured logs, data pipeline observability, and cost attribution.\n\nTry asking about: brand status, Teams ownership, the tagging strategy, APM service map, monitors and SLOs, loyalty/delivery shared services, or triggering an outage scenario.`;
+  return `Great question about the ${CUSTOMER.company} platform! This demo spans **${brandCount} brands** (${brandList}) with full Datadog coverage: APM (${svcCount} services), ${monCount} monitors with P1–P3 triage runbooks, ${brandCount} brand SLOs, synthetics, structured logs, data pipeline observability, and cost attribution.\n\nTry asking about: brand status, Teams ownership, the tagging strategy, APM service map, monitors and SLOs, loyalty/delivery shared services, or triggering an outage scenario.`;
 }
 
 app.post('/api/chat', async (req, res) => {
@@ -701,9 +630,9 @@ app.post('/api/chat', async (req, res) => {
       const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
 
       await LLMObs.trace({
-        kind: 'llm', name: 'inspire_brands_chat',
+        kind: 'llm', name: 'platform_chat',
         modelName: 'claude-sonnet-4-6', modelProvider: 'anthropic',
-        sessionId, mlApp: 'inspire-brands-assistant',
+        sessionId, mlApp: CUSTOMER.mlApp,
       }, async (span) => {
         span.setTag('brand', brandTag);
         span.setTag('session_id', sessionId);
@@ -737,9 +666,9 @@ app.post('/api/chat', async (req, res) => {
 
       if (LLMObs && typeof LLMObs.trace === 'function') {
         await LLMObs.trace({
-          kind: 'llm', name: 'inspire_brands_chat',
-          modelName: 'inspire-assistant-v1', modelProvider: 'inspire-internal',
-          sessionId, mlApp: 'inspire-brands-assistant',
+          kind: 'llm', name: 'platform_chat',
+          modelName: CUSTOMER.servicePrefix + '-assistant-v1', modelProvider: CUSTOMER.servicePrefix + '-internal',
+          sessionId, mlApp: CUSTOMER.mlApp,
         }, async (span) => {
           span.setTag('brand', brandTag);
           span.setTag('session_id', sessionId);
@@ -755,7 +684,7 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    dogstatsd.increment('llm.requests',      1,                   [`brand:${brandTag}`, 'model:inspire-assistant-v1', 'app:inspire-brands-assistant']);
+    dogstatsd.increment('llm.requests',      1,                   [`brand:${brandTag}`, `model:${CUSTOMER.servicePrefix}-assistant-v1`, `app:${CUSTOMER.mlApp}`]);
     dogstatsd.histogram('llm.input_tokens',  usage.input_tokens,  [`brand:${brandTag}`]);
     dogstatsd.histogram('llm.output_tokens', usage.output_tokens, [`brand:${brandTag}`]);
 
@@ -884,7 +813,7 @@ setInterval(() => {
 }, 15000);
 
 app.listen(PORT, () => {
-  logger.info('inspire-brands-platform started', {
+  logger.info(`${CUSTOMER.platform} started`, {
     port:   PORT,
     env:    process.env.DD_ENV || 'local',
     brands: BRAND_KEYS.length,

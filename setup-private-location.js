@@ -44,7 +44,9 @@ function ddRequest(method, urlPath, body) {
 
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-const BRANDS = ['arbys','bww','sonic','dunkin','baskin-robbins','jimmy-johns'];
+const CUSTOMER = require('./app/customer.config');
+const SERVICE  = CUSTOMER.platform;
+const BRANDS   = CUSTOMER.brands.map(b => b.key);
 
 // Synthetics created by setup-rum.js — read from dd-assets.json
 const ASSETS_PATH = path.join(__dirname,'app','public','dd-assets.json');
@@ -55,9 +57,9 @@ async function main() {
   // ── Step 1: Create the private location ──────────────────
   console.log('Step 1/4: Creating private location in Datadog…');
   const plRes = await ddRequest('POST', '/api/v1/synthetics/private-locations', {
-    name:        'Inspire Brands — Local Demo',
+    name:        `${CUSTOMER.company} — Local Demo`,
     description: 'Private location running on the demo laptop to test http://localhost:3000',
-    tags:        ['env:local','service:inspire-brands-platform','team:inspire-platform'],
+    tags:        ['env:local',`service:${SERVICE}`,`team:${CUSTOMER.platformTeam}`],
   });
 
   if (plRes.status !== 200 && plRes.status !== 201) {

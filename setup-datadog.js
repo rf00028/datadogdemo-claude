@@ -32,12 +32,15 @@ if (fs.existsSync(envPath)) {
   });
 }
 
-const API_KEY  = process.env.DD_API_KEY;
-const APP_KEY  = process.env.DD_APP_KEY;
-const SITE     = process.env.DD_SITE || 'datadoghq.com';
-const SERVICE  = 'inspire-brands-platform';
-const ENV_TAG  = process.env.DD_ENV || 'local';
-const NOTIFY   = '';  // e.g. '@ricky.fair@datadoghq.com'
+const CUSTOMER  = require('./app/customer.config');
+const API_KEY   = process.env.DD_API_KEY;
+const APP_KEY   = process.env.DD_APP_KEY;
+const SITE      = process.env.DD_SITE || 'datadoghq.com';
+const SERVICE   = CUSTOMER.platform;
+const METRIC    = CUSTOMER.metricPrefix;
+const SVC_PFX   = CUSTOMER.servicePrefix;
+const ENV_TAG   = process.env.DD_ENV || 'local';
+const NOTIFY    = '';  // e.g. '@ricky.fair@datadoghq.com'
 
 if (!API_KEY || API_KEY === 'your_api_key_here') {
   console.error('\n✗  DD_API_KEY missing in .env\n'); process.exit(1);
@@ -49,14 +52,7 @@ if (!APP_KEY || APP_KEY === 'your_app_key_here') {
 }
 
 // ── Brand definitions ────────────────────────────────────────────────────────
-const BRANDS = [
-  { key: 'arbys',           name: "Arby's",            team: 'arbys-ops', color: '#E31837' },
-  { key: 'bww',             name: 'Buffalo Wild Wings', team: 'bww-ops',   color: '#F5A800' },
-  { key: 'sonic',           name: 'Sonic Drive-In',     team: 'sonic-ops', color: '#005FA3' },
-  { key: 'dunkin',          name: "Dunkin'",             team: 'dunkin-ops',color: '#FF671F' },
-  { key: 'baskin-robbins',  name: 'Baskin-Robbins',      team: 'br-ops',    color: '#E8256A' },
-  { key: 'jimmy-johns',     name: "Jimmy John's",        team: 'jj-ops',    color: '#C8102E' },
-];
+const BRANDS = CUSTOMER.brands;
 
 // ── HTTP helper ──────────────────────────────────────────────────────────────
 function ddRequest(method, urlPath, body) {
@@ -119,7 +115,7 @@ async function getPrivateLocations() {
 // ─────────────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════╗');
-  console.log('║  🍔  Inspire Brands × Datadog — Demo Setup               ║');
+  console.log(`║  📊  ${CUSTOMER.company} × Datadog — Demo Setup               ║`);
   console.log('╚══════════════════════════════════════════════════════════╝\n');
   console.log(`  Site:    https://app.${SITE}`);
   console.log(`  Service: ${SERVICE}  •  Env: ${ENV_TAG}`);
@@ -136,9 +132,9 @@ async function main() {
       data: {
         type: 'teams',
         attributes: {
-          name:        'Inspire Platform Engineering',
-          handle:      'inspire-platform',
-          description: 'Owns the inspire-brands-platform service and cross-brand infrastructure',
+          name:        CUSTOMER.platformTeamName,
+          handle:      CUSTOMER.platformTeam,
+          description: `Owns the ${CUSTOMER.platform} service and cross-brand infrastructure`,
         },
       },
     },
@@ -179,7 +175,7 @@ async function main() {
       {
         name:    `${prefix} POS Error Rate — > 5 errors in 5m`,
         type:    'query alert',
-        query:   `sum(last_5m):sum:inspire.pos.errors{${tag}}.as_count() > 5`,
+        query:   `sum(last_5m):sum:${METRIC}.pos.errors{${tag}}.as_count() > 5`,
         message: `🔴 **${brand.name}** POS is logging {{value}} errors in 5 minutes.\n\nThis may indicate a POS outage or payment gateway issue.\n\n[View APM Traces](https://app.${SITE}/apm/traces?query=service:${SERVICE}+brand:${brand.key}+status:error) ${NOTIFY}`,
         tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, tag, team, 'monitor_type:errors', 'brand_monitor:true'],
         options: {
@@ -199,7 +195,7 @@ async function main() {
       {
         name:    `${prefix} POS p95 Latency > 1500ms`,
         type:    'query alert',
-        query:   `avg(last_10m):avg:inspire.pos.processing_time.95percentile{${tag}} > 1500`,
+        query:   `avg(last_10m):avg:${METRIC}.pos.processing_time.95percentile{${tag}} > 1500`,
         message: `⏱ **${brand.name}** POS p95 latency is **{{value}}ms** (threshold: 1500ms).\n\nThis could indicate a slow database query, payment processor delay, or resource contention.\n\n[View slow traces](https://app.${SITE}/apm/traces?query=service:${SERVICE}+brand:${brand.key}) ${NOTIFY}`,
         tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, tag, team, 'monitor_type:latency', 'brand_monitor:true'],
         options: {
@@ -218,8 +214,8 @@ async function main() {
       {
         name:    `${prefix} Anomalous Order Volume`,
         type:    'query alert',
-        query:   `avg(last_4h):anomalies(sum:inspire.orders.created{${tag}}.as_count(), 'basic', 2) >= 1`,
-        message: `🔮 **${brand.name}** order volume is behaving anomalously.\n\nEither a significant drop (possible outage) or spike (possible abuse/bot traffic) has been detected.\n\n[View metrics](https://app.${SITE}/metric/explorer?q=inspire.orders.created{${tag}}) ${NOTIFY}`,
+        query:   `avg(last_4h):anomalies(sum:${METRIC}.orders.created{${tag}}.as_count(), 'basic', 2) >= 1`,
+        message: `🔮 **${brand.name}** order volume is behaving anomalously.\n\nEither a significant drop (possible outage) or spike (possible abuse/bot traffic) has been detected.\n\n[View metrics](https://app.${SITE}/metric/explorer?q=${METRIC}.orders.created{${tag}}) ${NOTIFY}`,
         tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, tag, team, 'monitor_type:anomaly', 'brand_monitor:true'],
         options: {
           thresholds:     { critical: 1 },
@@ -240,9 +236,9 @@ async function main() {
     {
       name:    `[${SERVICE}] Platform-Wide Error Rate — All Brands`,
       type:    'query alert',
-      query:   `sum(last_5m):sum:inspire.http.requests{service:${SERVICE},status:500}.as_count() > 20`,
-      message: `🚨 **Inspire Brands Platform** is seeing **{{value}} HTTP 500 errors** across all brands in 5 minutes.\n\nThis is a platform-level event — investigate shared infrastructure (loyalty service, delivery gateway, database).\n\n[APM Overview](https://app.${SITE}/apm/services?env=${ENV_TAG}) ${NOTIFY}`,
-      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, 'team:inspire-platform', 'monitor_type:platform'],
+      query:   `sum(last_5m):sum:${METRIC}.http.requests{service:${SERVICE},status:500}.as_count() > 20`,
+      message: `🚨 **${CUSTOMER.company} Platform** is seeing **{{value}} HTTP 500 errors** across all brands in 5 minutes.\n\nThis is a platform-level event — investigate shared infrastructure (loyalty service, delivery gateway, database).\n\n[APM Overview](https://app.${SITE}/apm/services?env=${ENV_TAG}) ${NOTIFY}`,
+      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, `team:${CUSTOMER.platformTeam}`, 'monitor_type:platform'],
       options: { thresholds: { critical: 20, warning: 10 }, notify_no_data: false, include_tags: true },
     },
     created.monitors
@@ -254,9 +250,9 @@ async function main() {
     {
       name:    `[${SERVICE}] Loyalty Service — Elevated Error Rate (All Brands)`,
       type:    'query alert',
-      query:   `sum(last_5m):sum:inspire.loyalty.errors{service:${SERVICE}}.as_count() > 10`,
+      query:   `sum(last_5m):sum:${METRIC}.loyalty.errors{service:${SERVICE}}.as_count() > 10`,
       message: `💛 The **Loyalty Service** is failing across brands — **{{value}} lookup failures** in 5m.\n\nThis shared service impacts all 6 brands. Check loyalty DB connection pool and upstream dependencies.\n\n${NOTIFY}`,
-      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, 'team:inspire-platform', 'monitor_type:loyalty'],
+      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, `team:${CUSTOMER.platformTeam}`, 'monitor_type:loyalty'],
       options: { thresholds: { critical: 10, warning: 5 }, notify_no_data: false, include_tags: true },
     },
     created.monitors
@@ -268,9 +264,9 @@ async function main() {
     {
       name:    `[${SERVICE}] Delivery ETA p95 > 60 minutes`,
       type:    'query alert',
-      query:   `avg(last_10m):avg:inspire.delivery.eta.95percentile{service:${SERVICE}} > 60`,
+      query:   `avg(last_10m):avg:${METRIC}.delivery.eta.95percentile{service:${SERVICE}} > 60`,
       message: `🚚 Delivery wait times are critically high — p95 ETA is **{{value}} minutes** across all brands.\n\nThis likely indicates a delivery partner surge or service degradation.\n\n${NOTIFY}`,
-      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, 'team:inspire-platform', 'monitor_type:delivery'],
+      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, `team:${CUSTOMER.platformTeam}`, 'monitor_type:delivery'],
       options: { thresholds: { critical: 60, warning: 45 }, notify_no_data: false, include_tags: true },
     },
     created.monitors
@@ -308,7 +304,7 @@ async function main() {
       locations,
       options: { tick_every: 60, min_failure_duration: 0, min_location_failed: 1 },
       message: `🔴 **${SERVICE}** platform health check failed! ${NOTIFY}`,
-      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, 'team:inspire-platform', 'synthetic_type:availability'],
+      tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, `team:${CUSTOMER.platformTeam}`, 'synthetic_type:availability'],
       status:  'live',
     },
     created.synthetics
@@ -352,20 +348,20 @@ async function main() {
   const brandColors = Object.fromEntries(BRANDS.map(b => [b.key, b.color]));
 
   await create(
-    '📊 Inspire Brands — Executive Overview',
+    `📊 ${CUSTOMER.company} — Executive Overview`,
     'POST', '/api/v1/dashboard',
     {
-      title:       '🍔 Inspire Brands — Digital Platform Overview',
-      description: 'Cross-brand observability: orders, POS health, loyalty, delivery, and alerts across all 6 Inspire brands',
+      title:       CUSTOMER.dashboardTitle,
+      description: CUSTOMER.dashboardDescription,
       layout_type: 'ordered',
-      tags:        ['team:inspire-platform'],
+      tags:        [`team:${CUSTOMER.platformTeam}`],
       widgets: [
 
         // ── Row 1: Platform KPIs ──────────────────────────────────────────────
         {
           definition: {
             type: 'query_value', title: 'Total Orders (1h)',
-            requests: [{ q: `sum:inspire.orders.created{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
+            requests: [{ q: `sum:${METRIC}.orders.created{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
             time: { live_span: '1h' }, precision: 0,
           },
           layout: { x: 0, y: 0, width: 2, height: 2 },
@@ -373,7 +369,7 @@ async function main() {
         {
           definition: {
             type: 'query_value', title: 'POS Errors (15m)',
-            requests: [{ q: `sum:inspire.pos.errors{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
+            requests: [{ q: `sum:${METRIC}.pos.errors{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
             time: { live_span: '15m' }, precision: 0,
             custom_links: [{ label: 'View error traces', link: `https://app.${SITE}/apm/traces?query=service:${SERVICE}+status:error` }],
           },
@@ -382,7 +378,7 @@ async function main() {
         {
           definition: {
             type: 'query_value', title: 'Loyalty Errors (15m)',
-            requests: [{ q: `sum:inspire.loyalty.errors{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
+            requests: [{ q: `sum:${METRIC}.loyalty.errors{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
             time: { live_span: '15m' }, precision: 0,
           },
           layout: { x: 4, y: 0, width: 2, height: 2 },
@@ -390,7 +386,7 @@ async function main() {
         {
           definition: {
             type: 'query_value', title: 'POS p95 Latency (avg)',
-            requests: [{ q: `avg:inspire.pos.processing_time.95percentile{service:${SERVICE}}`, aggregator: 'avg' }],
+            requests: [{ q: `avg:${METRIC}.pos.processing_time.95percentile{service:${SERVICE}}`, aggregator: 'avg' }],
             time: { live_span: '15m' }, precision: 0, custom_unit: 'ms',
           },
           layout: { x: 6, y: 0, width: 2, height: 2 },
@@ -398,7 +394,7 @@ async function main() {
         {
           definition: {
             type: 'query_value', title: 'Delivery ETA p95 (avg)',
-            requests: [{ q: `avg:inspire.delivery.eta.95percentile{service:${SERVICE}}`, aggregator: 'avg' }],
+            requests: [{ q: `avg:${METRIC}.delivery.eta.95percentile{service:${SERVICE}}`, aggregator: 'avg' }],
             time: { live_span: '15m' }, precision: 0, custom_unit: 'min',
           },
           layout: { x: 8, y: 0, width: 2, height: 2 },
@@ -406,7 +402,7 @@ async function main() {
         {
           definition: {
             type: 'query_value', title: 'Loyalty Lookups (1h)',
-            requests: [{ q: `sum:inspire.loyalty.lookup_latency.count{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
+            requests: [{ q: `sum:${METRIC}.loyalty.lookup_latency.count{service:${SERVICE}}.as_count()`, aggregator: 'sum' }],
             time: { live_span: '1h' }, precision: 0,
           },
           layout: { x: 10, y: 0, width: 2, height: 2 },
@@ -418,10 +414,10 @@ async function main() {
             type:  'timeseries',
             title: 'Order Volume by Brand',
             requests: BRANDS.map(b => ({
-              q:            `sum:inspire.orders.created{brand:${b.key}}.as_count()`,
+              q:            `sum:${METRIC}.orders.created{brand:${b.key}}.as_count()`,
               display_type: 'bars',
               style:        { line_type: 'solid', line_width: 'normal' },
-              metadata:     [{ expression: `sum:inspire.orders.created{brand:${b.key}}.as_count()`, alias_name: b.name }],
+              metadata:     [{ expression: `sum:${METRIC}.orders.created{brand:${b.key}}.as_count()`, alias_name: b.name }],
             })),
             yaxis: { include_zero: true },
             time:  { live_span: '1h' },
@@ -435,9 +431,9 @@ async function main() {
             type:  'timeseries',
             title: 'POS Errors by Brand',
             requests: BRANDS.map(b => ({
-              q:            `sum:inspire.pos.errors{brand:${b.key}}.as_count()`,
+              q:            `sum:${METRIC}.pos.errors{brand:${b.key}}.as_count()`,
               display_type: 'bars',
-              metadata:     [{ expression: `sum:inspire.pos.errors{brand:${b.key}}.as_count()`, alias_name: b.name }],
+              metadata:     [{ expression: `sum:${METRIC}.pos.errors{brand:${b.key}}.as_count()`, alias_name: b.name }],
             })),
             yaxis: { include_zero: true },
             time:  { live_span: '1h' },
@@ -451,7 +447,7 @@ async function main() {
             type:  'query_value',
             title: `${b.name} — Orders (1h)`,
             requests: [{
-              q:          `sum:inspire.orders.created{brand:${b.key}}.as_count()`,
+              q:          `sum:${METRIC}.orders.created{brand:${b.key}}.as_count()`,
               aggregator: 'sum',
             }],
             time:      { live_span: '1h' },
@@ -467,9 +463,9 @@ async function main() {
             type:  'timeseries',
             title: 'POS Processing Time p95 by Brand',
             requests: BRANDS.map(b => ({
-              q:            `avg:inspire.pos.processing_time.95percentile{brand:${b.key}}`,
+              q:            `avg:${METRIC}.pos.processing_time.95percentile{brand:${b.key}}`,
               display_type: 'line',
-              metadata:     [{ expression: `avg:inspire.pos.processing_time.95percentile{brand:${b.key}}`, alias_name: b.name }],
+              metadata:     [{ expression: `avg:${METRIC}.pos.processing_time.95percentile{brand:${b.key}}`, alias_name: b.name }],
             })),
             yaxis:  { include_zero: true, label: 'ms' },
             time:   { live_span: '1h' },
@@ -484,9 +480,9 @@ async function main() {
             type:  'timeseries',
             title: 'Loyalty Lookup Latency p95 by Brand',
             requests: BRANDS.map(b => ({
-              q:            `avg:inspire.loyalty.lookup_latency.95percentile{brand:${b.key}}`,
+              q:            `avg:${METRIC}.loyalty.lookup_latency.95percentile{brand:${b.key}}`,
               display_type: 'line',
-              metadata:     [{ expression: `avg:inspire.loyalty.lookup_latency.95percentile{brand:${b.key}}`, alias_name: b.name }],
+              metadata:     [{ expression: `avg:${METRIC}.loyalty.lookup_latency.95percentile{brand:${b.key}}`, alias_name: b.name }],
             })),
             yaxis: { include_zero: true, label: 'ms' },
             time:  { live_span: '1h' },
@@ -518,7 +514,7 @@ async function main() {
             type:  'timeseries',
             title: 'Feature Flag Evaluations (by flag)',
             requests: [{
-              q:            `sum:inspire.feature_flag.evaluation{service:${SERVICE}} by {flag_name}.as_count()`,
+              q:            `sum:${METRIC}.feature_flag.evaluation{service:${SERVICE}} by {flag_name}.as_count()`,
               display_type: 'bars',
             }],
             time: { live_span: '1h' },
@@ -586,25 +582,25 @@ async function main() {
           // KPIs
           {
             definition: { type: 'query_value', title: 'Orders (1h)',
-              requests: [{ q: `sum:inspire.orders.created{${tag}}.as_count()`, aggregator: 'sum' }],
+              requests: [{ q: `sum:${METRIC}.orders.created{${tag}}.as_count()`, aggregator: 'sum' }],
               time: { live_span: '1h' }, precision: 0 },
             layout: { x: 0, y: 0, width: 3, height: 2 },
           },
           {
             definition: { type: 'query_value', title: 'POS Errors (15m)',
-              requests: [{ q: `sum:inspire.pos.errors{${tag}}.as_count()`, aggregator: 'sum' }],
+              requests: [{ q: `sum:${METRIC}.pos.errors{${tag}}.as_count()`, aggregator: 'sum' }],
               time: { live_span: '15m' }, precision: 0 },
             layout: { x: 3, y: 0, width: 3, height: 2 },
           },
           {
             definition: { type: 'query_value', title: 'Loyalty Lookups (1h)',
-              requests: [{ q: `sum:inspire.loyalty.lookup_latency.count{${tag}}.as_count()`, aggregator: 'sum' }],
+              requests: [{ q: `sum:${METRIC}.loyalty.lookup_latency.count{${tag}}.as_count()`, aggregator: 'sum' }],
               time: { live_span: '1h' }, precision: 0 },
             layout: { x: 6, y: 0, width: 3, height: 2 },
           },
           {
             definition: { type: 'query_value', title: 'POS p95 Latency',
-              requests: [{ q: `avg:inspire.pos.processing_time.95percentile{${tag}}`, aggregator: 'avg' }],
+              requests: [{ q: `avg:${METRIC}.pos.processing_time.95percentile{${tag}}`, aggregator: 'avg' }],
               time: { live_span: '15m' }, precision: 0, custom_unit: 'ms' },
             layout: { x: 9, y: 0, width: 3, height: 2 },
           },
@@ -614,7 +610,7 @@ async function main() {
             definition: {
               type: 'timeseries', title: 'Order Volume by Channel',
               requests: [{
-                q:            `sum:inspire.orders.created{${tag}} by {channel}.as_count()`,
+                q:            `sum:${METRIC}.orders.created{${tag}} by {channel}.as_count()`,
                 display_type: 'bars',
               }],
               yaxis: { include_zero: true },
@@ -626,8 +622,8 @@ async function main() {
             definition: {
               type: 'timeseries', title: 'POS Processing Time — p50 vs p95',
               requests: [
-                { q: `avg:inspire.pos.processing_time.median{${tag}}`,         display_type: 'line', metadata: [{ expression: `avg:inspire.pos.processing_time.median{${tag}}`,         alias_name: 'p50' }] },
-                { q: `avg:inspire.pos.processing_time.95percentile{${tag}}`,   display_type: 'line', metadata: [{ expression: `avg:inspire.pos.processing_time.95percentile{${tag}}`,   alias_name: 'p95' }] },
+                { q: `avg:${METRIC}.pos.processing_time.median{${tag}}`,         display_type: 'line', metadata: [{ expression: `avg:${METRIC}.pos.processing_time.median{${tag}}`,         alias_name: 'p50' }] },
+                { q: `avg:${METRIC}.pos.processing_time.95percentile{${tag}}`,   display_type: 'line', metadata: [{ expression: `avg:${METRIC}.pos.processing_time.95percentile{${tag}}`,   alias_name: 'p95' }] },
               ],
               yaxis: { include_zero: true, label: 'ms' },
               time:  { live_span: '1h' },
@@ -641,7 +637,7 @@ async function main() {
             definition: {
               type: 'timeseries', title: 'Loyalty Lookup Latency',
               requests: [
-                { q: `avg:inspire.loyalty.lookup_latency.95percentile{${tag}}`, display_type: 'line', metadata: [{ expression: `avg:inspire.loyalty.lookup_latency.95percentile{${tag}}`, alias_name: 'p95' }] },
+                { q: `avg:${METRIC}.loyalty.lookup_latency.95percentile{${tag}}`, display_type: 'line', metadata: [{ expression: `avg:${METRIC}.loyalty.lookup_latency.95percentile{${tag}}`, alias_name: 'p95' }] },
               ],
               yaxis: { include_zero: true, label: 'ms' },
               time:  { live_span: '1h' },
@@ -651,7 +647,7 @@ async function main() {
           {
             definition: {
               type: 'timeseries', title: 'Delivery ETA Distribution',
-              requests: [{ q: `avg:inspire.delivery.eta.95percentile{${tag}}`, display_type: 'line' }],
+              requests: [{ q: `avg:${METRIC}.delivery.eta.95percentile{${tag}}`, display_type: 'line' }],
               yaxis: { include_zero: true, label: 'min' },
               time:  { live_span: '1h' },
               markers: [{ value: 'y = 45', display_type: 'warning dashed', label: 'Warning' }, { value: 'y = 60', display_type: 'error dashed', label: 'Critical' }],
@@ -708,17 +704,17 @@ async function main() {
 
   // Platform service
   await create(
-    `🌐 Service Catalog: inspire-brands-platform`,
+    `🌐 Service Catalog: ${CUSTOMER.platform}`,
     'POST', '/api/v2/services/definitions',
     {
       'schema-version': 'v2.2',
       'dd-service':     SERVICE,
-      team:             'inspire-platform',
-      description:      'Multi-brand digital platform serving POS, loyalty, and delivery for 6 Inspire Brands. Routes requests to brand-specific services.',
+      team:             CUSTOMER.platformTeam,
+      description:      `Multi-brand digital platform serving ${CUSTOMER.company} brands. Routes requests to brand-specific services.`,
       type:             'web',
       tier:             'High',
       languages:        ['JavaScript'],
-      tags:             ['team:inspire-platform', 'env:local'],
+      tags:             [`team:${CUSTOMER.platformTeam}`, 'env:local'],
       links: [
         { name: 'Exec Dashboard', type: 'dashboard', url: `https://app.${SITE}/dashboard/${dashIds.platform || ''}` },
         { name: 'APM Service',    type: 'other',     url: `https://app.${SITE}/apm/services/${SERVICE}?env=${ENV_TAG}` },
@@ -749,7 +745,7 @@ async function main() {
 
   for (const brand of BRANDS) {
     for (const svc of SERVICE_TYPES) {
-      const ddService = `inspire-${brand.key}-${svc.suffix}`;
+      const ddService = `${SVC_PFX}-${brand.key}-${svc.suffix}`;
       const dashId    = dashIds[brand.key] || '';
       await create(
         `📦 ${brand.name}: ${svc.suffix}`,
@@ -799,8 +795,8 @@ async function main() {
   console.log('');
   console.log('  Tagging strategy:');
   console.log(`    service:${SERVICE}`);
-  console.log('    brand:<key>   (arbys | bww | sonic | dunkin | baskin-robbins | jimmy-johns)');
-  console.log('    team:<handle> (arbys-ops | bww-ops | sonic-ops | dunkin-ops | br-ops | jj-ops)');
+  console.log(`    brand:<key>   (${BRANDS.map(b => b.key).join(' | ')})`);
+  console.log(`    team:<handle> (${BRANDS.map(b => b.team).join(' | ')})`);
   console.log('    env:<env>     channel:<channel>   monitor_type:<type>');
   console.log('');
 
@@ -818,7 +814,7 @@ async function main() {
     dashboards: dashMap,
     urls: {
       execDashboard:  `https://app.${SITE}/dashboard/${dashMap.platform}`,
-      apm:            `https://app.${SITE}/apm/services?env=${ENV_TAG}&search=inspire`,
+      apm:            `https://app.${SITE}/apm/services?env=${ENV_TAG}&search=${SVC_PFX}`,
       apmMap:         `https://app.${SITE}/apm/map?env=${ENV_TAG}`,
       monitors:       `https://app.${SITE}/monitors/manage?q=service%3A${SERVICE}`,
       serviceCatalog: `https://app.${SITE}/services`,
@@ -829,7 +825,7 @@ async function main() {
     },
     brandLinks: Object.fromEntries(BRANDS.map(b => [b.key, {
       dashboard:  `https://app.${SITE}/dashboard/${dashMap[b.key]}`,
-      apm:        `https://app.${SITE}/apm/services/inspire-${b.key}-pos?env=${ENV_TAG}`,
+      apm:        `https://app.${SITE}/apm/services/${SVC_PFX}-${b.key}-pos?env=${ENV_TAG}`,
       monitors:   `https://app.${SITE}/monitors/manage?q=team%3A${b.team}`,
       logs:       `https://app.${SITE}/logs?query=service%3A${SERVICE}+brand%3A${b.key}`,
     }])),
