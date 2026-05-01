@@ -4,7 +4,7 @@ A full-stack observability demo simulating a multi-brand platform (restaurant, r
 
 All customer-specific data — company name, brands, teams, metric prefix, service names — lives in a single config file (`app/customer.config.js`). Swap the config and re-run the setup scripts to stand up a fresh demo for any customer.
 
-The repo ships with an **Inspire Brands** configuration as the default.
+The repo ships with a sample multi-brand restaurant configuration as the default.
 
 ---
 
@@ -226,8 +226,8 @@ Every signal (metric, log, trace, RUM event) carries a consistent tag set:
 
 ```
 service:{platform}           # top-level service
-brand:{key}                  # e.g. brand:sonic
-team:{brand}-ops             # e.g. team:sonic-ops
+brand:{key}                  # e.g. brand:brand-a
+team:{brand}-ops             # e.g. team:brand-a-ops
 channel:{channel}            # e.g. channel:drive-thru
 env:local
 version:1.0.0
@@ -250,7 +250,7 @@ dd-demo-app/
 │       ├── dd-assets.json     # Written by setup scripts — dashboard/RUM IDs
 │       └── brands/
 │           ├── app.html       # Per-brand RUM web app (loaded at /brands/:brand)
-│           └── inspire.html   # Inspire Brands global portal (/inspire)
+│           └── inspire.html   # Global portal (/inspire)
 ├── setup-datadog.js           # Creates teams, monitors, synthetics, dashboards
 ├── setup-rum.js               # Creates RUM apps, adds RUM widgets to dashboards
 ├── setup-private-location.js  # Creates DD private location, updates synthetics
@@ -285,21 +285,6 @@ Tests run via the **Private Location** Docker container (`dd-private-location`),
 - One POS order test per brand: `POST /api/:brand/orders`
 
 The private location config lives in `private-location-config.json` (git-ignored — contains credentials).
-
----
-
-## SSH / Git Notes
-
-This repo uses a dedicated GitHub SSH key. Push requires bypassing the SSH agent:
-
-```bash
-SSH_AUTH_SOCK="" git push
-```
-
-The correct key is configured in git config:
-```
-core.sshCommand = ssh -i ~/.ssh/id_ed25519_github -o IdentitiesOnly=yes -o AddKeysToAgent=no
-```
 
 ---
 

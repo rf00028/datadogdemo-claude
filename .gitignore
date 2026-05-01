@@ -2,6 +2,9 @@
 .env
 private-location-config.json
 
+# Presenter/admin demo controls — not for public GitHub
+app/public/presenter.html
+
 # Node
 app/node_modules/
 node_modules/

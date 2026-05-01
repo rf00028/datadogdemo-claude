@@ -739,6 +739,11 @@ app.get('/api/security/file', (req, res) => {
   res.json({ file: filePath, content: 'demo content', timestamp: new Date().toISOString() });
 });
 
+// ── Presenter (admin demo controls) ──────────────────────
+app.get('/presenter', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'presenter.html'));
+});
+
 // ── Brand web apps ────────────────────────────────────────
 app.get('/inspire', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'brands', 'inspire.html'));
