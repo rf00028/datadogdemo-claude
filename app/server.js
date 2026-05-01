@@ -8,7 +8,8 @@ const tracer = require('dd-trace').init({
   profiling: false,
 });
 
-const { LLMObs } = require('dd-trace');
+const ddTrace = require('dd-trace');
+const LLMObs  = ddTrace.LLMObs;
 
 const express        = require('express');
 const path           = require('path');
@@ -20,8 +21,10 @@ const { v4: uuidv4 } = require('uuid');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 let   Anthropic     = null;
 
-// Always enable LLMObs — mock path still emits real spans when no API key
-LLMObs.enable({ mlApp: 'inspire-brands-assistant', agentlessEnabled: false });
+// Enable LLMObs — guard in case dd-trace version doesn't export it
+if (LLMObs && typeof LLMObs.enable === 'function') {
+  LLMObs.enable({ mlApp: 'inspire-brands-assistant', agentlessEnabled: false });
+}
 
 if (ANTHROPIC_KEY) {
   Anthropic = require('@anthropic-ai/sdk');
