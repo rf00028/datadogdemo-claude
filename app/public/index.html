@@ -708,6 +708,7 @@
           </div>
 
           <div class="brand-dd-links">
+            <a class="bdd-link" href="/brands/${b.key}" target="_blank" style="background:${b.color}22;border-color:${b.color}55;color:#fff;">🌐 Web App</a>
             <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.dashboard || '#'}" target="_blank">📊 Dashboard</a>
             <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.apm || 'https://app.datadoghq.com/apm/services?env=local&search=inspire-' + b.key}" target="_blank">⬡ APM</a>
             <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.monitors || 'https://app.datadoghq.com/monitors/manage?q=team%3A' + b.team}" target="_blank">🔔 Monitors</a>
