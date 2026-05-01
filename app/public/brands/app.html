@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading…</title>
+  <script src="https://www.datadoghq-browser-agent.com/us1/v5/datadog-rum.js" type="text/javascript"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--brand:#e31837;--brand-dark:#b01229;--brand-light:#ffeef1}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;min-height:100vh;padding-bottom:80px}
+
+    /* Header */
+    .header{background:var(--brand);color:#fff;padding:0 16px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+    .header-left{display:flex;align-items:center;gap:10px}
+    .brand-logo{width:36px;height:36px;border-radius:50%;object-fit:contain;background:#fff;padding:2px}
+    .brand-name{font-size:17px;font-weight:700;letter-spacing:-.3px}
+    .cart-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:6px 12px;border-radius:20px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:.15s}
+    .cart-btn:hover{background:rgba(255,255,255,.3)}
+    .cart-count{background:#fff;color:var(--brand);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+
+    /* Status banner */
+    .status-banner{padding:8px 16px;font-size:13px;font-weight:600;text-align:center;display:none}
+    .status-banner.outage{background:#fee2e2;color:#991b1b;display:block}
+    .status-banner.slow{background:#fef3c7;color:#92400e;display:block}
+    .status-banner.degraded{background:#fef3c7;color:#92400e;display:block}
+
+    /* Tab nav */
+    .tab-nav{background:#fff;border-bottom:1px solid #e5e7eb;display:flex;position:sticky;top:56px;z-index:99}
+    .tab{flex:1;padding:12px 4px;text-align:center;font-size:13px;font-weight:600;color:#6b7280;border-bottom:2px solid transparent;cursor:pointer;transition:.15s;user-select:none}
+    .tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+
+    /* Views */
+    .view{display:none;padding:16px;animation:fadeIn .2s ease}
+    .view.active{display:block}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+    /* Menu grid */
+    .menu-hero{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;border-radius:12px;padding:20px;margin-bottom:16px;text-align:center}
+    .menu-hero h2{font-size:22px;font-weight:800;margin-bottom:4px}
+    .menu-hero p{font-size:13px;opacity:.85}
+    .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .menu-card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;transition:.15s;border:2px solid transparent}
+    .menu-card:hover{border-color:var(--brand);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.12)}
+    .menu-card:active{transform:scale(.98)}
+    .item-emoji{font-size:32px;display:block;margin-bottom:8px}
+    .item-name{font-size:13px;font-weight:600;color:#111;margin-bottom:4px;line-height:1.3}
+    .item-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+    .item-price{font-size:15px;font-weight:700;color:var(--brand)}
+    .add-btn{background:var(--brand);color:#fff;border:none;width:28px;height:28px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+    .add-btn:hover{background:var(--brand-dark);transform:scale(1.1)}
+    .category-tag{font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px}
+
+    /* Cart */
+    .cart-empty{text-align:center;padding:48px 16px;color:#9ca3af}
+    .cart-empty-icon{font-size:48px;margin-bottom:12px}
+    .cart-item{background:#fff;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+    .cart-item-info{flex:1}
+    .cart-item-name{font-size:14px;font-weight:600;color:#111}
+    .cart-item-price{font-size:13px;color:#6b7280;margin-top:2px}
+    .remove-btn{background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
+    .remove-btn:hover{background:#fee2e2}
+    .cart-summary{background:#fff;border-radius:10px;padding:14px;margin-top:8px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+    .cart-row{display:flex;justify-content:space-between;margin-bottom:6px;font-size:14px;color:#6b7280}
+    .cart-total{display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:#111;padding-top:10px;border-top:1px solid #e5e7eb;margin-top:4px}
+    .channel-select{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;margin:12px 0;background:#fff;color:#111}
+    .place-order-btn{width:100%;padding:14px;background:var(--brand);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:.15s;margin-top:4px}
+    .place-order-btn:hover{background:var(--brand-dark)}
+    .place-order-btn:disabled{background:#9ca3af;cursor:default}
+    .order-result{border-radius:10px;padding:16px;margin-top:12px;text-align:center}
+    .order-result.success{background:#d1fae5;color:#065f46}
+    .order-result.error{background:#fee2e2;color:#991b1b}
+    .order-result h3{font-size:16px;font-weight:700;margin-bottom:4px}
+    .order-result p{font-size:13px;opacity:.8}
+
+    /* Loyalty */
+    .loyalty-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px}
+    .loyalty-card h3{font-size:16px;font-weight:700;color:#111;margin-bottom:12px}
+    .loyalty-input-row{display:flex;gap:8px}
+    .loyalty-input{flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#111}
+    .loyalty-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-light)}
+    .lookup-btn{padding:10px 16px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s}
+    .lookup-btn:hover{background:var(--brand-dark)}
+    .points-display{background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;border-radius:12px;padding:20px;text-align:center;margin-top:12px;display:none}
+    .points-number{font-size:40px;font-weight:800;margin:8px 0}
+    .tier-badge{display:inline-block;background:rgba(255,255,255,.25);padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600;margin-bottom:8px}
+    .member-since{font-size:12px;opacity:.8}
+
+    /* Delivery */
+    .delivery-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center}
+    .delivery-card h3{font-size:16px;font-weight:700;color:#111;margin-bottom:6px}
+    .delivery-card p{font-size:13px;color:#6b7280;margin-bottom:16px}
+    .eta-btn{padding:12px 32px;background:var(--brand);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s}
+    .eta-btn:hover{background:var(--brand-dark)}
+    .eta-display{margin-top:16px;display:none}
+    .eta-number{font-size:56px;font-weight:800;color:var(--brand);line-height:1}
+    .eta-label{font-size:14px;color:#6b7280;margin-top:4px}
+    .surge-warning{background:#fef3c7;color:#92400e;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;margin-top:12px;display:none}
+
+    /* Loading skeleton */
+    .skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;height:16px;margin-bottom:8px}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* DD badge */
+    .dd-badge{position:fixed;bottom:16px;right:16px;background:#632ca6;color:#fff;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(99,44,166,.4);z-index:200;cursor:pointer;text-decoration:none}
+    .dd-badge:hover{background:#7c3aad}
+    .dd-dot{width:7px;height:7px;background:#52c41a;border-radius:50%;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+    /* Flag strip */
+    .flag-strip{background:#1e1e2e;color:#a5b4fc;font-size:11px;padding:4px 12px;text-align:center;font-family:monospace;display:none}
+    .flag-strip.visible{display:block}
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <img class="brand-logo" id="brandLogo" src="" alt="">
+    <span class="brand-name" id="brandNameHeader">Loading…</span>
+  </div>
+  <button class="cart-btn" onclick="switchTab('cart')">
+    🛒 Cart <span class="cart-count" id="cartCount">0</span>
+  </button>
+</div>
+
+<div class="flag-strip" id="flagStrip"></div>
+<div class="status-banner" id="statusBanner"></div>
+
+<nav class="tab-nav">
+  <div class="tab active" data-tab="menu"     onclick="switchTab('menu')">🍔 Menu</div>
+  <div class="tab"        data-tab="cart"     onclick="switchTab('cart')">🛒 Order</div>
+  <div class="tab"        data-tab="loyalty"  onclick="switchTab('loyalty')">⭐ Loyalty</div>
+  <div class="tab"        data-tab="delivery" onclick="switchTab('delivery')">🚗 Delivery</div>
+</nav>
+
+<!-- Menu -->
+<div class="view active" id="view-menu">
+  <div class="menu-hero">
+    <h2 id="brandTagline">Loading…</h2>
+    <p id="brandChannels"></p>
+  </div>
+  <div class="menu-grid" id="menuGrid">
+    <div class="skeleton" style="height:140px"></div>
+    <div class="skeleton" style="height:140px"></div>
+    <div class="skeleton" style="height:140px"></div>
+    <div class="skeleton" style="height:140px"></div>
+  </div>
+</div>
+
+<!-- Cart / Order -->
+<div class="view" id="view-cart">
+  <div id="cartEmpty" class="cart-empty">
+    <div class="cart-empty-icon">🛒</div>
+    <p style="font-weight:600;color:#374151">Your cart is empty</p>
+    <p style="font-size:13px;margin-top:4px">Head to the menu to add items</p>
+  </div>
+  <div id="cartItems"></div>
+  <div id="cartSummary" style="display:none">
+    <div class="cart-summary">
+      <div class="cart-row"><span>Subtotal</span><span id="cartSubtotal">$0.00</span></div>
+      <div class="cart-total"><span>Total</span><span id="cartTotal">$0.00</span></div>
+    </div>
+    <select class="channel-select" id="channelSelect"></select>
+    <button class="place-order-btn" id="placeOrderBtn" onclick="placeOrder()">Place Order</button>
+    <div class="order-result" id="orderResult"></div>
+  </div>
+</div>
+
+<!-- Loyalty -->
+<div class="view" id="view-loyalty">
+  <div class="loyalty-card">
+    <h3>🌟 Check Your Points</h3>
+    <div class="loyalty-input-row">
+      <input class="loyalty-input" id="loyaltyInput" placeholder="Enter your member ID" value="demo-user-42">
+      <button class="lookup-btn" onclick="lookupLoyalty()">Check</button>
+    </div>
+    <div class="points-display" id="pointsDisplay">
+      <div class="tier-badge" id="tierBadge">Bronze</div>
+      <div class="points-number" id="pointsNumber">0</div>
+      <div style="font-size:13px;opacity:.85">points</div>
+      <div class="member-since" id="memberSince" style="margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="loyalty-card" style="background:var(--brand-light)">
+    <h3 style="color:var(--brand)">How to Earn Points</h3>
+    <p style="font-size:13px;color:#6b7280;margin-top:8px;line-height:1.6">Earn 10 points for every $1 spent. Redeem 1,000 points for $10 off your next order. Gold members earn 15 points per dollar.</p>
+  </div>
+</div>
+
+<!-- Delivery -->
+<div class="view" id="view-delivery">
+  <div class="delivery-card">
+    <div style="font-size:48px;margin-bottom:8px">🚗</div>
+    <h3>Delivery Estimate</h3>
+    <p>See how long your order will take to arrive at your door.</p>
+    <button class="eta-btn" onclick="getDeliveryEta()">Get ETA</button>
+    <div class="eta-display" id="etaDisplay">
+      <div class="eta-number" id="etaNumber">—</div>
+      <div class="eta-label">minutes estimated</div>
+      <div class="surge-warning" id="surgeWarning">⚠️ High demand — extended delivery times in effect</div>
+    </div>
+  </div>
+</div>
+
+<a class="dd-badge" id="ddLink" href="#" target="_blank" title="View in Datadog RUM">
+  <span class="dd-dot"></span> LIVE in Datadog RUM
+</a>
+
+<script>
+const brandKey    = location.pathname.split('/').filter(Boolean).pop();
+const cart        = [];
+let   brandConfig = null;
+let   brandChannels = [];
+
+// ── Category emojis ──────────────────────────────────────
+const CATEGORY_EMOJIS = {
+  sandwiches: '🥪', wings: '🍗', burgers: '🍔', sides: '🍟',
+  drinks: '🥤', entrees: '🍽️', shareables: '🫕', 'hot-dogs': '🌭',
+  desserts: '🍦', coffee: '☕', donuts: '🍩', scoops: '🍨',
+  sundaes: '🍧', cakes: '🎂', 'slim-sandwiches': '🥖',
+  default: '🍱'
+};
+
+// ── RUM + dd-assets ──────────────────────────────────────
+async function initRUM() {
+  try {
+    const assets = await fetch('/dd-assets.json').then(r => r.json());
+    const rumCfg = assets.rum?.[brandKey];
+    if (rumCfg && window.DD_RUM) {
+      DD_RUM.init({
+        applicationId:          rumCfg.applicationId,
+        clientToken:            rumCfg.clientToken,
+        site:                   'datadoghq.com',
+        service:                `inspire-${brandKey}-web`,
+        env:                    'local',
+        version:                '1.0.0',
+        sessionSampleRate:      100,
+        sessionReplaySampleRate:100,
+        trackUserInteractions:  true,
+        trackResources:         true,
+        trackLongTasks:         true,
+        defaultPrivacyLevel:    'allow',
+      });
+      // Tag every RUM event with brand so sessions are filterable by brand facet
+      DD_RUM.setGlobalContextProperty('brand', brandKey);
+      DD_RUM.startView({ name: `${brandKey} - menu` });
+      // Link the DD badge to RUM
+      const rumUrl = `https://app.datadoghq.com/rum/explorer?query=service%3Ainspire-${brandKey}-web`;
+      document.getElementById('ddLink').href = rumUrl;
+    }
+    return assets;
+  } catch(e) { return {}; }
+}
+
+// ── Brand init ────────────────────────────────────────────
+async function init() {
+  const [brandsResp, menuResp, assets] = await Promise.all([
+    fetch('/api/brands').then(r => r.json()),
+    fetch(`/api/${brandKey}/menu`).then(r => r.json()),
+    initRUM(),
+  ]);
+
+  const brand = brandsResp.brands?.find(b => b.key === brandKey);
+  if (!brand) { document.body.innerHTML = '<div style="padding:40px;text-align:center">Brand not found</div>'; return; }
+
+  brandConfig   = brand;
+  brandChannels = brand.channels || [];
+
+  // Enrich all RUM events with brand identity — enables brand facet in RUM explorer
+  window.DD_RUM?.setGlobalContextProperty('brand',      brandKey);
+  window.DD_RUM?.setGlobalContextProperty('brand.name', brand.name);
+  window.DD_RUM?.setGlobalContextProperty('team',       brand.team);
+
+  // Apply brand theming
+  document.documentElement.style.setProperty('--brand',      brand.color);
+  document.documentElement.style.setProperty('--brand-dark', darken(brand.color, 20));
+  document.documentElement.style.setProperty('--brand-light',lighten(brand.color));
+  document.title = `${brand.name} — Order Online`;
+
+  // Header
+  const logoMap = assets.logos || {};
+  document.getElementById('brandLogo').src = assets.brandLogoUrls?.[brandKey] || '';
+  document.getElementById('brandLogo').alt = brand.name;
+  document.getElementById('brandNameHeader').textContent = brand.name;
+
+  // Menu hero
+  document.getElementById('brandTagline').textContent = brand.tagline || brand.name;
+  document.getElementById('brandChannels').textContent = brandChannels.join(' · ');
+
+  // Menu items
+  const menuGrid = document.getElementById('menuGrid');
+  menuGrid.innerHTML = '';
+  (menuResp.items || []).forEach(item => {
+    const emoji = CATEGORY_EMOJIS[item.category] || CATEGORY_EMOJIS.default;
+    const card  = document.createElement('div');
+    card.className = 'menu-card';
+    card.innerHTML = `
+      <span class="item-emoji">${emoji}</span>
+      <div class="item-name">${item.name}</div>
+      <div class="category-tag">${item.category}</div>
+      <div class="item-meta">
+        <span class="item-price">$${item.price.toFixed(2)}</span>
+        <button class="add-btn" onclick="addToCart(${JSON.stringify(item).replace(/"/g,'&quot;')})">+</button>
+      </div>`;
+    menuGrid.appendChild(card);
+  });
+
+  // Channel select
+  const sel = document.getElementById('channelSelect');
+  brandChannels.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c.replace(/-/g,' '); sel.appendChild(o); });
+
+  // Update status
+  updateStatus(brand);
+  syncFeatureFlags();
+}
+
+function darken(hex, pct) {
+  const n = parseInt(hex.slice(1),16);
+  const r = Math.max(0,((n>>16)&0xff)-pct*2);
+  const g = Math.max(0,((n>>8)&0xff)-pct*2);
+  const b = Math.max(0,(n&0xff)-pct*2);
+  return `#${[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('')}`;
+}
+function lighten(hex) {
+  const n = parseInt(hex.slice(1),16);
+  const r = Math.min(255,((n>>16)&0xff)+200);
+  const g = Math.min(255,((n>>8)&0xff)+200);
+  const b = Math.min(255,(n&0xff)+200);
+  return `#${[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('')}`;
+}
+
+function updateStatus(brand) {
+  const banner  = document.getElementById('statusBanner');
+  banner.className = 'status-banner';
+  if (brand.status === 'outage') {
+    banner.className += ' outage';
+    banner.textContent = `⚠️ POS system currently unavailable — orders may fail`;
+    banner.style.display = 'block';
+  } else if (brand.status === 'degraded') {
+    banner.className += ' slow';
+    banner.textContent = `⏱ Elevated response times — we're working on it`;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── Feature flags ─────────────────────────────────────────
+async function syncFeatureFlags() {
+  try {
+    const { flags } = await fetch('/api/flags').then(r => r.json());
+    const relevant = flags.filter(f => !f.brand || f.brand === brandKey);
+    const activeFlags = relevant.filter(f => f.enabled);
+
+    relevant.forEach(f => {
+      window.DD_RUM?.addFeatureFlagEvaluation(f.name, f.enabled);
+    });
+
+    const strip = document.getElementById('flagStrip');
+    if (activeFlags.length) {
+      strip.textContent = `🚩 Active flags: ${activeFlags.map(f=>f.name).join(', ')}`;
+      strip.classList.add('visible');
+    } else {
+      strip.classList.remove('visible');
+    }
+
+    // Re-fetch brand status
+    const brandsResp = await fetch('/api/brands').then(r => r.json());
+    const brand = brandsResp.brands?.find(b => b.key === brandKey);
+    if (brand) updateStatus(brand);
+  } catch(e) {}
+}
+setInterval(syncFeatureFlags, 8000);
+
+// ── Cart ──────────────────────────────────────────────────
+function addToCart(item) {
+  cart.push(item);
+  document.getElementById('cartCount').textContent = cart.length;
+  renderCart();
+
+  window.DD_RUM?.addAction('add_to_cart', {
+    brand:    brandKey,
+    item:     item.name,
+    price:    item.price,
+    category: item.category,
+  });
+
+  // Brief visual feedback
+  const btn = event.target;
+  btn.textContent = '✓';
+  btn.style.background = '#22c55e';
+  setTimeout(() => { btn.textContent = '+'; btn.style.background = ''; }, 800);
+}
+
+function removeFromCart(idx) {
+  cart.splice(idx, 1);
+  document.getElementById('cartCount').textContent = cart.length;
+  renderCart();
+}
+
+function renderCart() {
+  const itemsEl   = document.getElementById('cartItems');
+  const summaryEl = document.getElementById('cartSummary');
+  const emptyEl   = document.getElementById('cartEmpty');
+
+  if (cart.length === 0) {
+    emptyEl.style.display = 'block';
+    itemsEl.innerHTML = '';
+    summaryEl.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  summaryEl.style.display = 'block';
+
+  itemsEl.innerHTML = cart.map((item, i) => `
+    <div class="cart-item">
+      <div class="cart-item-info">
+        <div class="cart-item-name">${item.name}</div>
+        <div class="cart-item-price">$${item.price.toFixed(2)}</div>
+      </div>
+      <button class="remove-btn" onclick="removeFromCart(${i})">✕</button>
+    </div>`).join('');
+
+  const total = cart.reduce((s,i) => s+i.price, 0);
+  document.getElementById('cartSubtotal').textContent = `$${total.toFixed(2)}`;
+  document.getElementById('cartTotal').textContent     = `$${total.toFixed(2)}`;
+}
+
+// ── Place order ───────────────────────────────────────────
+async function placeOrder() {
+  if (cart.length === 0) return;
+  const btn     = document.getElementById('placeOrderBtn');
+  const result  = document.getElementById('orderResult');
+  const channel = document.getElementById('channelSelect').value;
+  const total   = cart.reduce((s,i) => s+i.price, 0);
+
+  btn.disabled     = true;
+  btn.textContent  = 'Placing order…';
+  result.className = 'order-result';
+  result.innerHTML = '';
+
+  const startTime = performance.now();
+
+  try {
+    const resp = await fetch(`/api/${brandKey}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ channel, itemId: cart[0]?.id, quantity: cart.length }),
+    });
+
+    const latency = Math.round(performance.now() - startTime);
+    const data    = await resp.json();
+
+    window.DD_RUM?.addAction('place_order', {
+      brand:   brandKey,
+      channel,
+      total:   +total.toFixed(2),
+      items:   cart.length,
+      latency_ms: latency,
+      status:  resp.status,
+      success: resp.ok,
+    });
+
+    if (resp.ok) {
+      result.className = 'order-result success';
+      result.innerHTML = `<h3>✅ Order Confirmed!</h3><p>Order #${data.id?.slice(0,8)} · ${data.item} · $${data.total}</p><p style="margin-top:4px">Processing time: ${latency}ms</p>`;
+      cart.length = 0;
+      document.getElementById('cartCount').textContent = 0;
+      renderCart();
+    } else {
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
+  } catch(e) {
+    const latency = Math.round(performance.now() - startTime);
+    result.className = 'order-result error';
+    result.innerHTML = `<h3>❌ Order Failed</h3><p>${e.message}</p>`;
+
+    window.DD_RUM?.addError(new Error(`Order failed: ${e.message}`), {
+      brand:      brandKey,
+      channel,
+      latency_ms: latency,
+      error_type: 'order_failure',
+    });
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Place Order';
+  }
+}
+
+// ── Loyalty ───────────────────────────────────────────────
+async function lookupLoyalty() {
+  const userId  = document.getElementById('loyaltyInput').value.trim() || 'demo-user';
+  const display = document.getElementById('pointsDisplay');
+
+  display.style.display = 'none';
+
+  window.DD_RUM?.addAction('check_loyalty', { brand: brandKey, user_id: userId });
+
+  try {
+    const resp = await fetch(`/api/${brandKey}/loyalty/${userId}`);
+    const data = await resp.json();
+
+    if (!resp.ok) throw new Error(data.error || 'Lookup failed');
+
+    document.getElementById('pointsNumber').textContent = data.points.toLocaleString();
+    document.getElementById('tierBadge').textContent    = `${data.tier} Member`;
+    document.getElementById('memberSince').textContent  = `Member since ${data.memberSince}`;
+    display.style.display = 'block';
+
+    window.DD_RUM?.addAction('loyalty_result', { brand: brandKey, tier: data.tier, points: data.points });
+  } catch(e) {
+    window.DD_RUM?.addError(new Error(`Loyalty lookup failed: ${e.message}`), { brand: brandKey });
+    alert(`Loyalty service error: ${e.message}`);
+  }
+}
+
+// ── Delivery ──────────────────────────────────────────────
+async function getDeliveryEta() {
+  window.DD_RUM?.addAction('get_delivery_estimate', { brand: brandKey });
+
+  try {
+    const resp = await fetch(`/api/${brandKey}/delivery/estimate`);
+    const data = await resp.json();
+
+    document.getElementById('etaNumber').textContent    = data.estimatedMinutes;
+    document.getElementById('etaDisplay').style.display = 'block';
+    document.getElementById('surgeWarning').style.display = data.surge ? 'block' : 'none';
+
+    window.DD_RUM?.addAction('delivery_estimate_shown', {
+      brand: brandKey, eta_min: data.estimatedMinutes, surge: data.surge,
+    });
+  } catch(e) {
+    window.DD_RUM?.addError(new Error(`Delivery estimate failed: ${e.message}`), { brand: brandKey });
+  }
+}
+
+// ── Tab navigation ────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === `view-${tab}`));
+  if (brandConfig) window.DD_RUM?.startView({ name: `${brandKey} - ${tab}` });
+}
+
+// ── Boot ──────────────────────────────────────────────────
+init().catch(e => { console.error(e); window.DD_RUM?.addError(e); });
+</script>
+</body>
+</html>

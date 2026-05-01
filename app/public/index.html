@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inspire Brands — Datadog Platform Demo</title>
+
+  <!-- Datadog Browser RUM -->
+  <script>
+    (function(h,o,u,n,d){
+      h=h[d]=h[d]||{q:[],onReady:function(c){h.q.push(c)}}
+      d=o.createElement(u);d.async=1;d.src=n
+      n=o.getElementsByTagName(u)[0];n.parentNode.insertBefore(d,n)
+    })(window,document,'script','https://www.datadoghq-browser-agent.com/us1/v5/datadog-rum.js','DD_RUM')
+    window.DD_RUM.onReady(function(){
+      window.DD_RUM.init({
+        applicationId: 'DD_RUM_APPLICATION_ID',
+        clientToken:   'DD_RUM_CLIENT_TOKEN',
+        site:          'datadoghq.com',
+        service:       'inspire-brands-platform',
+        env:           'local',
+        version:       '1.0.0',
+        sessionSampleRate:         100,
+        sessionReplaySampleRate:   100,
+        trackUserInteractions:     true,
+        trackResources:            true,
+        trackLongTasks:            true,
+        defaultPrivacyLevel:       'mask-user-input',
+      })
+      window.DD_RUM.startSessionReplayRecording()
+    })
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0d14;
+      --surface: #141420;
+      --border:  #222234;
+      --muted:   #444466;
+      --text:    #e0e0f0;
+      --subtle:  #888899;
+      --dd:      #632ca6;
+      --green:   #22c55e;
+      --yellow:  #eab308;
+      --red:     #ef4444;
+      --radius:  12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 28px 24px 48px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .header-left h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .header-left h1 span { color: var(--dd); }
+    .header-left p { color: var(--subtle); font-size: 0.875rem; margin-top: 4px; }
+    .dd-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--dd); color: #fff; border-radius: 6px;
+      padding: 4px 12px; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+    }
+
+    /* ── Platform KPIs ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+    }
+    .kpi-label { font-size: 0.72rem; color: var(--subtle); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .kpi-value { font-size: 1.6rem; font-weight: 700; color: #fff; }
+    .kpi-value.green { color: var(--green); }
+    .kpi-value.red   { color: var(--red);   }
+    .kpi-value.yellow{ color: var(--yellow);}
+
+    /* ── Section headers ── */
+    .section-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px; margin-top: 32px;
+    }
+    .section-header h2 { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--subtle); }
+    .section-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── Brand grid ── */
+    .brand-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .brand-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .brand-card:hover { border-color: var(--muted); }
+
+    .brand-card-accent {
+      height: 4px;
+      width: 100%;
+    }
+
+    .brand-card-body { padding: 16px 18px 18px; }
+
+    .brand-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .brand-name { font-size: 1rem; font-weight: 700; color: #fff; }
+    .brand-tagline { font-size: 0.72rem; color: var(--subtle); margin-top: 2px; }
+    .brand-team {
+      font-size: 0.65rem; font-weight: 700; color: var(--subtle);
+      background: var(--border); border-radius: 4px;
+      padding: 2px 7px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;
+    }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.7rem; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+    .status-healthy { background: rgba(34,197,94,0.12); color: var(--green); }
+    .status-healthy::before { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+    .status-degraded { background: rgba(234,179,8,0.12); color: var(--yellow); }
+    .status-degraded::before { background: var(--yellow); }
+    .status-outage { background: rgba(239,68,68,0.12); color: var(--red); }
+    .status-outage::before { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse-red 1s infinite; }
+
+    @keyframes pulse     { 0%,100%{ opacity:1 } 50%{ opacity:0.4 } }
+    @keyframes pulse-red { 0%,100%{ opacity:1 } 50%{ opacity:0.3 } }
+
+    /* Brand metrics */
+    .brand-metrics {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px; margin-bottom: 14px;
+    }
+    .bm { background: var(--bg); border-radius: 7px; padding: 8px 10px; }
+    .bm-label { font-size: 0.62rem; color: var(--subtle); text-transform: uppercase; letter-spacing: 0.04em; }
+    .bm-value { font-size: 1rem; font-weight: 700; color: #fff; margin-top: 2px; }
+
+    /* Action buttons */
+    .brand-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    .btn {
+      padding: 5px 11px; border: none; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn:hover  { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn-ghost { background: var(--border); color: var(--text); }
+    .btn-order { background: #1a5c2e; color: #4ade80; border: 1px solid #22c55e44; }
+    .btn-loyalty { background: #1e2a4a; color: #93c5fd; border: 1px solid #3b82f644; }
+    .btn-delivery { background: #2a1a3e; color: #c4b5fd; border: 1px solid #7c3aed44; }
+
+    /* Incident toggles per brand */
+    .incident-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 6px 0; border-top: 1px solid var(--border);
+    }
+    .incident-label { font-size: 0.72rem; color: var(--subtle); }
+    .incident-label strong { color: var(--text); }
+
+    .toggle { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: var(--border); border-radius: 22px; transition: .2s;
+    }
+    .slider:before {
+      content: ''; position: absolute;
+      height: 16px; width: 16px; left: 3px; bottom: 3px;
+      background: #666; border-radius: 50%; transition: .2s;
+    }
+    .toggle input:checked + .slider { background: var(--red); }
+    .toggle input:checked + .slider:before { transform: translateX(16px); background: #fff; }
+    .toggle.slow input:checked + .slider { background: var(--yellow); }
+
+    /* ── Scenario panel ── */
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .scenario-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .scenario-card h3 { font-size: 0.875rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .scenario-card p  { font-size: 0.72rem; color: var(--subtle); margin-bottom: 12px; line-height: 1.5; }
+    .btn-scenario-red    { background: var(--red);    color: #fff; width: 100%; padding: 8px; border-radius: 7px; font-size: 0.78rem; font-weight: 700; border: none; cursor: pointer; transition: opacity .15s; }
+    .btn-scenario-yellow { background: var(--yellow); color: #000; width: 100%; padding: 8px; border-radius: 7px; font-size: 0.78rem; font-weight: 700; border: none; cursor: pointer; transition: opacity .15s; }
+    .btn-scenario-blue   { background: #3b82f6;       color: #fff; width: 100%; padding: 8px; border-radius: 7px; font-size: 0.78rem; font-weight: 700; border: none; cursor: pointer; transition: opacity .15s; }
+    .btn-scenario-green  { background: var(--green);  color: #000; width: 100%; padding: 8px; border-radius: 7px; font-size: 0.78rem; font-weight: 700; border: none; cursor: pointer; transition: opacity .15s; }
+    .btn-scenario-red:hover, .btn-scenario-yellow:hover,
+    .btn-scenario-blue:hover, .btn-scenario-green:hover { opacity: 0.85; }
+
+    /* ── Auto traffic + log flood row ── */
+    .tools-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) { .tools-row { grid-template-columns: 1fr; } }
+
+    .tool-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .tool-card h3 { font-size: 0.875rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .tool-card p  { font-size: 0.72rem; color: var(--subtle); margin-bottom: 14px; line-height: 1.5; }
+    .tool-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .btn-auto { background: var(--border); color: var(--subtle); border: 1px solid var(--muted); padding: 7px 16px; border-radius: 7px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+    .btn-auto.running { background: var(--green); color: #000; border-color: transparent; }
+    .btn-purple { background: var(--dd); color: #fff; padding: 7px 16px; border-radius: 7px; font-size: 0.78rem; font-weight: 700; border: none; cursor: pointer; transition: opacity .15s; }
+    .btn-purple:hover { opacity: 0.85; }
+
+    select {
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 7px 10px; font-size: 0.78rem;
+    }
+
+    .flood-result { font-size: 0.72rem; color: var(--subtle); margin-top: 8px; min-height: 16px; }
+
+    /* ── Console ── */
+    .console-wrap {
+      background: #08080f;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 32px;
+    }
+    .console-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .console-header span { font-size: 0.72rem; font-weight: 700; color: var(--subtle); letter-spacing: 0.06em; text-transform: uppercase; }
+    .console-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.72rem; }
+    #log {
+      padding: 12px 16px;
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 0.75rem;
+      line-height: 1.7;
+      height: 280px;
+      overflow-y: auto;
+    }
+    .log-entry { display: flex; gap: 10px; }
+    .log-time  { color: #444466; min-width: 78px; flex-shrink: 0; }
+    .log-ok    { color: #4ade80; }
+    .log-err   { color: #f87171; }
+    .log-warn  { color: #fbbf24; }
+    .log-info  { color: #60a5fa; }
+    .log-brand { color: #c084fc; margin-right: 4px; }
+
+    /* ── DD Quick Links bar ── */
+    .dd-links-bar {
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 24px; padding: 10px 14px;
+      background: #0a0a10; border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .dd-links-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; white-space: nowrap; }
+    .dd-link {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600;
+      color: #c084fc; background: rgba(99,44,166,0.15); border: 1px solid rgba(99,44,166,0.3);
+      text-decoration: none; white-space: nowrap; transition: all 0.15s;
+    }
+    .dd-link:hover { background: rgba(99,44,166,0.35); border-color: #632ca6; color: #fff; }
+    .dd-link.green { color: #34d399; background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.3); }
+    .dd-link.green:hover { background: rgba(52,211,153,0.25); color: #fff; }
+
+    /* ── Per-brand DD shortcut links ── */
+    .brand-dd-links { display: flex; gap: 5px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--border); margin-top: 4px; }
+    .bdd-link {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; border-radius: 5px; font-size: 0.65rem; font-weight: 600;
+      color: var(--subtle); background: var(--bg); border: 1px solid var(--border);
+      text-decoration: none; transition: all 0.15s; white-space: nowrap;
+    }
+    .bdd-link:hover { color: #c084fc; border-color: #632ca6; background: rgba(99,44,166,0.12); }
+
+    /* ── Chat widget ── */
+    #chatBtn {
+      position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--dd); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; box-shadow: 0 4px 20px rgba(99,44,166,0.5);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #chatBtn:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(99,44,166,0.7); }
+    #chatPanel {
+      position: fixed; bottom: 88px; right: 24px; z-index: 1000;
+      width: 380px; max-width: calc(100vw - 48px);
+      background: var(--surface); border: 1px solid #3a2a50; border-radius: 14px;
+      overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+      display: none; flex-direction: column;
+    }
+    #chatPanel.open { display: flex; }
+    .chat-header {
+      background: linear-gradient(135deg, #2a1a40, #1a1028);
+      border-bottom: 1px solid #3a2a50; padding: 14px 16px;
+      display: flex; align-items: flex-start; justify-content: space-between;
+    }
+    .chat-header-left .title { font-size: 0.875rem; font-weight: 700; color: #fff; }
+    .chat-header-left .sub   { font-size: 0.65rem; color: #a78bca; margin-top: 2px; }
+    .llm-badge {
+      display: inline-flex; align-items: center; gap: 4px; margin-top: 5px;
+      background: rgba(52,211,153,0.1); color: #34d399; border: 1px solid rgba(52,211,153,0.25);
+      border-radius: 4px; padding: 2px 7px; font-size: 0.6rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em; width: fit-content;
+    }
+    .chat-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; }
+    .chat-close:hover { color: #fff; }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+      height: 300px; font-size: 0.8rem; line-height: 1.5;
+    }
+    .chat-msg { display: flex; gap: 8px; }
+    .chat-msg.user { flex-direction: row-reverse; }
+    .chat-msg .bubble { padding: 8px 12px; border-radius: 10px; max-width: 85%; }
+    .chat-msg.user   .bubble { background: var(--dd); color: #fff; border-radius: 10px 10px 2px 10px; }
+    .chat-msg.assist .bubble { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px 10px 10px 2px; }
+    .chat-msg.system .bubble { background: rgba(52,211,153,0.07); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.15); font-size: 0.72rem; width: 100%; text-align: center; border-radius: 6px; }
+    .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 10px 14px; }
+    .typing-indicator span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: tbounce 1.2s ease-in-out infinite; }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes tbounce { 0%,60%,100%{ transform:translateY(0) } 30%{ transform:translateY(-5px) } }
+    .chat-suggestions { display: flex; flex-direction: column; gap: 5px; padding: 0 12px 10px; }
+    .chat-sug {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 10px; font-size: 0.7rem; color: var(--subtle);
+      cursor: pointer; text-align: left; transition: all 0.15s;
+    }
+    .chat-sug:hover { color: #c084fc; border-color: #632ca6; background: rgba(99,44,166,0.1); }
+    .chat-input-row { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+    #chatInput {
+      flex: 1; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 12px; font-size: 0.8rem; font-family: inherit;
+    }
+    #chatInput:focus { outline: none; border-color: var(--dd); }
+    #chatSend {
+      background: var(--dd); color: #fff; border: none; border-radius: 8px;
+      padding: 8px 14px; cursor: pointer; font-size: 0.78rem; font-weight: 700;
+      transition: opacity 0.15s;
+    }
+    #chatSend:hover { opacity: 0.85; }
+    #chatSend:disabled { opacity: 0.4; cursor: default; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Inspire Brands <span>× Datadog</span></h1>
+      <p>Multi-brand platform observability · Teams · APM · Logs · Metrics · Synthetics</p>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+      <div class="dd-badge">⬡ Datadog APM · 6 Brands · 6 Teams</div>
+      <div style="font-size:0.7rem;color:var(--subtle);">
+        service: <code style="color:#c084fc;">inspire-brands-platform</code>
+        &nbsp;·&nbsp; env: <code style="color:#c084fc;" id="envTag">local</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Datadog Quick Links ── -->
+  <div class="dd-links-bar" id="ddLinksBar">
+    <span class="dd-links-label">Open in Datadog →</span>
+    <a class="dd-link" id="lnkExec"    href="#" target="_blank">📊 Exec Dashboard</a>
+    <a class="dd-link" id="lnkApmMap"  href="https://app.datadoghq.com/apm/map?env=local" target="_blank">🗺 APM Service Map</a>
+    <a class="dd-link" id="lnkApm"     href="https://app.datadoghq.com/apm/services?env=local&search=inspire" target="_blank">⬡ APM Services</a>
+    <a class="dd-link" id="lnkMonitors"href="https://app.datadoghq.com/monitors/manage?q=service%3Ainspire-brands-platform" target="_blank">🔔 Monitors</a>
+    <a class="dd-link" id="lnkCatalog" href="https://app.datadoghq.com/services" target="_blank">📦 Service Catalog</a>
+    <a class="dd-link" id="lnkSynth"   href="https://app.datadoghq.com/synthetics/list?query=service%3Ainspire-brands-platform" target="_blank">🧪 Synthetics</a>
+    <a class="dd-link" id="lnkLogs"    href="https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform" target="_blank">📝 Logs</a>
+    <a class="dd-link" id="lnkTeams"   href="https://app.datadoghq.com/organization-settings/teams" target="_blank">🏢 Teams</a>
+    <a class="dd-link green" id="lnkLlm" href="https://app.datadoghq.com/llm/traces" target="_blank">✦ LLM Observability</a>
+    <a class="dd-link" id="lnkAsm" href="https://app.datadoghq.com/security/appsec" target="_blank">🛡 App Security</a>
+  </div>
+
+  <!-- ── Platform KPIs ── -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Total Orders</div>
+      <div class="kpi-value green" id="kpiOrders">0</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Total Revenue</div>
+      <div class="kpi-value green" id="kpiRevenue">$0.00</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Platform Errors</div>
+      <div class="kpi-value" id="kpiErrors">0</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Brands Online</div>
+      <div class="kpi-value" id="kpiBrands">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Requests Sent</div>
+      <div class="kpi-value" id="kpiRequests">0</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Auto Traffic</div>
+      <div class="kpi-value" id="kpiAutoStatus" style="font-size:0.9rem;color:var(--subtle);">OFF</div>
+    </div>
+  </div>
+
+  <!-- ── Brand Cards ── -->
+  <div class="section-header"><h2>Brand Operations</h2></div>
+  <div class="brand-grid" id="brandGrid">
+    <div style="color:var(--subtle);font-size:0.8rem;padding:20px;">Loading brands…</div>
+  </div>
+
+  <!-- ── Scenario Panel ── -->
+  <div class="section-header" style="margin-top:36px;"><h2>Demo Scenarios</h2></div>
+  <div class="scenario-grid">
+
+    <div class="scenario-card" style="border-color:#ef444444;">
+      <h3>Brand Outage</h3>
+      <p>Take one brand's POS system down. Watch it surface as a 503 in APM, fire an alert, and route to the brand's team.</p>
+      <select id="outage-brand-select" style="width:100%;margin-bottom:8px;">
+        <option value="">Select brand…</option>
+      </select>
+      <button class="btn-scenario-red" onclick="triggerBrandOutage()">Trigger POS Outage</button>
+    </div>
+
+    <div class="scenario-card" style="border-color:#eab30844;">
+      <h3>Slow POS</h3>
+      <p>Inject 3× latency into a single brand's POS. Watch p95 climb in the APM service map without triggering an outage.</p>
+      <select id="slow-brand-select" style="width:100%;margin-bottom:8px;">
+        <option value="">Select brand…</option>
+      </select>
+      <button class="btn-scenario-yellow" onclick="triggerBrandSlow()">Inject POS Latency</button>
+    </div>
+
+    <div class="scenario-card" style="border-color:#3b82f644;">
+      <h3>Loyalty Degraded</h3>
+      <p>Degrade the shared loyalty service across all 6 brands — elevated errors and latency visible in every brand's logs.</p>
+      <button class="btn-scenario-blue" id="loyaltyBtn" onclick="toggleScenario('loyalty-degraded', 'loyaltyBtn')">Enable Loyalty Degradation</button>
+    </div>
+
+    <div class="scenario-card" style="border-color:#7c3aed44;">
+      <h3>Delivery Surge</h3>
+      <p>Simulate a demand surge — 3× delivery ETAs across all brands. Great for showing SLO burn rate.</p>
+      <button class="btn-scenario-blue" id="deliveryBtn" onclick="toggleScenario('delivery-surge', 'deliveryBtn')">Enable Delivery Surge</button>
+    </div>
+
+    <div class="scenario-card" style="border-color:#22c55e44;">
+      <h3>All Clear</h3>
+      <p>Reset all incident flags across all brands and services. Return the platform to a healthy baseline state.</p>
+      <button class="btn-scenario-green" onclick="allClear()">Reset All Incidents</button>
+    </div>
+
+    <div class="scenario-card">
+      <h3>Traffic Burst</h3>
+      <p>Fire 10 rapid orders across random brands and channels to generate a burst of APM traces and business metrics.</p>
+      <button class="btn-scenario-blue" onclick="trafficBurst()">Fire 10 Orders</button>
+    </div>
+
+  </div>
+
+  <!-- ── Tools row ── -->
+  <div class="section-header" style="margin-top:36px;"><h2>Traffic &amp; Logs</h2></div>
+  <div class="tools-row">
+
+    <div class="tool-card">
+      <h3>Auto Traffic Generator</h3>
+      <p>Continuously fires mixed requests across all 6 brands — orders, loyalty lookups, delivery estimates — every 1.5s.</p>
+      <div class="tool-row">
+        <button class="btn-auto" id="autoBtn" onclick="toggleAuto()">▶ Start Auto Traffic</button>
+      </div>
+    </div>
+
+    <div class="tool-card">
+      <h3>Log Flood → Datadog</h3>
+      <p>Burst structured info / warn / error logs into Datadog Logs, optionally scoped to a single brand.</p>
+      <div class="tool-row">
+        <select id="floodBrand">
+          <option value="">All brands</option>
+        </select>
+        <select id="floodCount">
+          <option value="25">25 logs</option>
+          <option value="50" selected>50 logs</option>
+          <option value="100">100 logs</option>
+          <option value="200">200 logs</option>
+        </select>
+        <button class="btn-purple" onclick="floodLogs()">Flood Logs</button>
+      </div>
+      <div class="flood-result" id="floodResult"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Security & LLM Demo ── -->
+  <div class="section-header" style="margin-top:36px;"><h2>Security &amp; LLM Observability</h2></div>
+  <div class="tools-row">
+
+    <div class="tool-card" style="border-color:#ef444433;">
+      <h3>🛡 Application Security (ASM)</h3>
+      <p>Fire simulated attack payloads against the API. Datadog ASM detects and surfaces these as security signals in real time — no real damage, fully observable.</p>
+      <div class="tool-row" style="flex-wrap:wrap;gap:8px;">
+        <button class="btn-scenario-red" onclick="secAttack('sqli')">💉 SQL Injection</button>
+        <button class="btn-scenario-red" onclick="secAttack('xss')">⚡ XSS Probe</button>
+        <button class="btn-scenario-red" onclick="secAttack('traversal')">📂 Path Traversal</button>
+        <button class="btn-scenario-yellow" onclick="secAttack('login')">🔑 Brute-Force Login</button>
+      </div>
+      <div style="margin-top:10px;font-size:0.75rem;color:var(--subtle);">Results surface in <a href="https://app.datadoghq.com/security/appsec" target="_blank" style="color:#c084fc;">Datadog App Security</a> → Traces &amp; Signals</div>
+    </div>
+
+    <div class="tool-card" style="border-color:#632ca633;">
+      <h3>✦ LLM Observability</h3>
+      <p>Every chatbot message is traced as an LLMObs span — input/output tokens, latency, brand context, and session ID visible in Datadog.</p>
+      <div class="tool-row" style="flex-wrap:wrap;gap:8px;">
+        <button class="btn-purple" onclick="sendLlmSuggestion('What is the current status of all brands?')">Brand Status Query</button>
+        <button class="btn-purple" onclick="sendLlmSuggestion('Walk me through how Datadog Teams work in this demo')">Teams Explanation</button>
+        <button class="btn-purple" onclick="sendLlmSuggestion('What happens when a POS outage is triggered?')">Outage Scenario</button>
+      </div>
+      <div id="llmResult" style="margin-top:10px;font-size:0.75rem;color:var(--subtle);"></div>
+      <div style="margin-top:8px;font-size:0.75rem;color:var(--subtle);">View traces in <a href="https://app.datadoghq.com/llm/traces" target="_blank" style="color:#c084fc;">LLM Observability</a> · ml_app: <code style="color:#c084fc;">inspire-brands-assistant</code></div>
+    </div>
+
+  </div>
+
+  <!-- ── Console ── -->
+  <div class="console-wrap">
+    <div class="console-header">
+      <span>Response Console</span>
+      <button class="console-clear" onclick="clearLog()">clear</button>
+    </div>
+    <div id="log"></div>
+  </div>
+
+<script>
+  // ── State ────────────────────────────────────────────────
+  let brandsData    = [];
+  let flagsData     = {};
+  let autoInterval  = null;
+  let requestCount  = 0;
+
+  // ── Logging ──────────────────────────────────────────────
+  function ts() { return new Date().toLocaleTimeString('en-US', { hour12: false }); }
+
+  function addLog(cls, brand, method, path, status, body) {
+    const log   = document.getElementById('log');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    const preview = typeof body === 'object'
+      ? JSON.stringify(body).substring(0, 140)
+      : String(body).substring(0, 140);
+    const brandTag = brand ? `<span class="log-brand">[${brand}]</span>` : '';
+    entry.innerHTML = `
+      <span class="log-time">${ts()}</span>
+      <span class="${cls}">${brandTag}[${status}] ${method} ${path} → ${preview}</span>`;
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+    requestCount++;
+    document.getElementById('kpiRequests').textContent = requestCount;
+  }
+
+  function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+  // ── API helper ───────────────────────────────────────────
+  async function api(method, path, body, brand) {
+    try {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      if (body) opts.body = JSON.stringify(body);
+      const res  = await fetch(path, opts);
+      const data = await res.json().catch(() => ({}));
+      const cls  = res.ok ? 'log-ok' : res.status >= 500 ? 'log-err' : 'log-warn';
+      addLog(cls, brand || null, method, path, res.status, data);
+      return { ok: res.ok, status: res.status, data };
+    } catch (e) {
+      addLog('log-err', brand || null, method, path, 'NET', e.message);
+      return { ok: false };
+    }
+  }
+
+  // ── Brand data polling ───────────────────────────────────
+  async function loadBrands() {
+    const res = await fetch('/api/brands');
+    if (!res.ok) return;
+    const json = await res.json();
+    brandsData = json.brands;
+
+    // Update KPIs
+    document.getElementById('kpiOrders').textContent   = json.platform.totalOrders.toLocaleString();
+    document.getElementById('kpiRevenue').textContent  = '$' + json.platform.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 });
+    const errEl = document.getElementById('kpiErrors');
+    errEl.textContent = json.platform.totalErrors;
+    errEl.className   = 'kpi-value' + (json.platform.totalErrors > 0 ? ' red' : ' green');
+
+    const healthy = brandsData.filter(b => b.status === 'healthy').length;
+    const brandsEl = document.getElementById('kpiBrands');
+    brandsEl.textContent = `${healthy} / ${brandsData.length}`;
+    brandsEl.className = 'kpi-value' + (healthy < brandsData.length ? ' yellow' : ' green');
+
+    renderBrandGrid(brandsData);
+    populateBrandSelects(brandsData);
+  }
+
+  function renderBrandGrid(brands) {
+    const grid = document.getElementById('brandGrid');
+    grid.innerHTML = brands.map(b => {
+      const statusClass = { healthy: 'status-healthy', degraded: 'status-degraded', outage: 'status-outage' }[b.status];
+      const statusLabel = { healthy: 'Healthy', degraded: 'Degraded', outage: 'POS Outage' }[b.status];
+      const outageFlag  = `${b.key}-pos-outage`;
+      const slowFlag    = `${b.key}-slow-pos`;
+      const outageOn    = flagsData[outageFlag] || false;
+      const slowOn      = flagsData[slowFlag]   || false;
+
+      return `
+      <div class="brand-card" id="card-${b.key}">
+        <div class="brand-card-accent" style="background:${b.color};"></div>
+        <div class="brand-card-body">
+          <div class="brand-header">
+            <div>
+              <div class="brand-name" style="color:${b.color};">${b.name}</div>
+              <div class="brand-tagline">${b.tagline}</div>
+            </div>
+            <div class="brand-team">team:${b.team}</div>
+          </div>
+
+          <div class="status-badge ${statusClass}">${statusLabel}</div>
+
+          <div class="brand-metrics">
+            <div class="bm">
+              <div class="bm-label">Orders</div>
+              <div class="bm-value">${b.metrics.totalOrders.toLocaleString()}</div>
+            </div>
+            <div class="bm">
+              <div class="bm-label">Revenue</div>
+              <div class="bm-value">$${b.metrics.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="bm">
+              <div class="bm-label">Errors</div>
+              <div class="bm-value" style="${b.metrics.errors > 0 ? 'color:var(--red)' : ''}">${b.metrics.errors}</div>
+            </div>
+          </div>
+
+          <div class="brand-actions">
+            <button class="btn btn-ghost" onclick="getMenu('${b.key}')">Menu</button>
+            <button class="btn btn-order"    onclick="createOrder('${b.key}')">+ Order</button>
+            <button class="btn btn-loyalty"  onclick="loyaltyCheck('${b.key}')">Loyalty</button>
+            <button class="btn btn-delivery" onclick="deliveryEta('${b.key}')">Delivery ETA</button>
+          </div>
+
+          <div class="incident-row">
+            <div class="incident-label"><strong>POS Outage</strong> · 503 on all orders</div>
+            <label class="toggle">
+              <input type="checkbox" id="flag-${outageFlag}" ${outageOn ? 'checked' : ''}
+                onchange="toggleFlag('${outageFlag}', this)">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="incident-row">
+            <div class="incident-label"><strong>Slow POS</strong> · 3× latency</div>
+            <label class="toggle slow">
+              <input type="checkbox" id="flag-${slowFlag}" ${slowOn ? 'checked' : ''}
+                onchange="toggleFlag('${slowFlag}', this)">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="brand-dd-links">
+            <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.dashboard || '#'}" target="_blank">📊 Dashboard</a>
+            <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.apm || 'https://app.datadoghq.com/apm/services?env=local&search=inspire-' + b.key}" target="_blank">⬡ APM</a>
+            <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.monitors || 'https://app.datadoghq.com/monitors/manage?q=team%3A' + b.team}" target="_blank">🔔 Monitors</a>
+            <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.logs || 'https://app.datadoghq.com/logs?query=brand%3A' + b.key}" target="_blank">📝 Logs</a>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Flags ────────────────────────────────────────────────
+  async function loadFlags() {
+    const res = await fetch('/api/flags');
+    if (!res.ok) return;
+    const json = await res.json();
+    flagsData = Object.fromEntries(json.flags.map(f => [f.name, f.enabled]));
+
+    // Sync global scenario buttons
+    const loyaltyOn  = flagsData['loyalty-degraded'];
+    const deliveryOn = flagsData['delivery-surge'];
+    const lBtn = document.getElementById('loyaltyBtn');
+    const dBtn = document.getElementById('deliveryBtn');
+    if (lBtn) { lBtn.textContent = loyaltyOn  ? 'Disable Loyalty Degradation' : 'Enable Loyalty Degradation';  lBtn.style.background = loyaltyOn  ? 'var(--red)' : ''; }
+    if (dBtn) { dBtn.textContent = deliveryOn ? 'Disable Delivery Surge'      : 'Enable Delivery Surge';       dBtn.style.background = deliveryOn ? 'var(--red)' : ''; }
+  }
+
+  async function toggleFlag(name, checkbox) {
+    if (checkbox) checkbox.disabled = true;
+    const res = await fetch(`/api/flags/${name}/toggle`, { method: 'POST' });
+    const d   = await res.json();
+    if (checkbox) { checkbox.checked = d.enabled; checkbox.disabled = false; }
+    flagsData[name] = d.enabled;
+    addLog(d.enabled ? 'log-warn' : 'log-info', d.brand || null, 'POST', `/api/flags/${name}/toggle`, 200,
+      `${name} → ${d.enabled ? 'ENABLED' : 'DISABLED'}`);
+    loadBrands();
+    loadFlags();
+    if (window.DD_RUM && window.DD_RUM.addFeatureFlagEvaluation) {
+      window.DD_RUM.addFeatureFlagEvaluation(name, d.enabled);
+    }
+  }
+
+  // ── Brand actions ────────────────────────────────────────
+  async function getMenu(brand) {
+    await api('GET', `/api/${brand}/menu`, null, brand);
+  }
+
+  async function createOrder(brand) {
+    const brands  = brandsData.find(b => b.key === brand);
+    const channel = brands?.channels?.[Math.floor(Math.random() * (brands?.channels?.length || 1))] || 'in-store';
+    await api('POST', `/api/${brand}/orders`, {
+      itemId:    Math.ceil(Math.random() * 5),
+      channel,
+      quantity:  1,
+      loyaltyId: Math.random() > 0.5 ? `LYL-${Math.floor(Math.random() * 10000)}` : null,
+    }, brand);
+    setTimeout(loadBrands, 300);
+  }
+
+  async function loyaltyCheck(brand) {
+    const userId = Math.ceil(Math.random() * 9999);
+    await api('GET', `/api/${brand}/loyalty/${userId}`, null, brand);
+    setTimeout(loadBrands, 300);
+  }
+
+  async function deliveryEta(brand) {
+    await api('GET', `/api/${brand}/delivery/estimate`, null, brand);
+  }
+
+  // ── Scenario handlers ────────────────────────────────────
+  async function triggerBrandOutage() {
+    const brand = document.getElementById('outage-brand-select').value;
+    if (!brand) { alert('Please select a brand.'); return; }
+    const flagName = `${brand}-pos-outage`;
+    const current  = flagsData[flagName];
+    if (current) {
+      addLog('log-info', brand, 'INFO', 'scenario', '—', `${brand} POS outage already active`);
+      return;
+    }
+    await toggleFlag(flagName, null);
+  }
+
+  async function triggerBrandSlow() {
+    const brand = document.getElementById('slow-brand-select').value;
+    if (!brand) { alert('Please select a brand.'); return; }
+    const flagName = `${brand}-slow-pos`;
+    await toggleFlag(flagName, null);
+  }
+
+  async function toggleScenario(flagName, btnId) {
+    await toggleFlag(flagName, null);
+    loadFlags();
+  }
+
+  async function allClear() {
+    const allFlags = await fetch('/api/flags').then(r => r.json());
+    for (const f of allFlags.flags) {
+      if (f.enabled) await toggleFlag(f.name, null);
+    }
+    addLog('log-ok', null, 'SCENARIO', 'all-clear', '200', 'All incidents cleared — platform restored to healthy state');
+    loadBrands();
+    loadFlags();
+  }
+
+  async function trafficBurst() {
+    const BRAND_KEYS = brandsData.map(b => b.key);
+    if (!BRAND_KEYS.length) return;
+    addLog('log-info', null, 'BURST', '/api/*/orders', '—', 'Firing 10 orders across random brands…');
+    const promises = Array.from({ length: 10 }, () => {
+      const brand = BRAND_KEYS[Math.floor(Math.random() * BRAND_KEYS.length)];
+      return createOrder(brand);
+    });
+    await Promise.all(promises);
+  }
+
+  // ── Log flood ────────────────────────────────────────────
+  async function floodLogs() {
+    const count  = parseInt(document.getElementById('floodCount').value);
+    const brand  = document.getElementById('floodBrand').value || undefined;
+    const result = document.getElementById('floodResult');
+    result.textContent = `Firing ${count} log events…`;
+    result.style.color = 'var(--subtle)';
+    const res  = await api('POST', '/api/logs/flood', { count, brand: brand || undefined }, brand || null);
+    if (res.ok) {
+      const bd = res.data.breakdown?.map(b => `${b.count} ${b.level}`).join(' · ') || '';
+      result.textContent = `${res.data.fired} logs sent → ${bd}`;
+      result.style.color = 'var(--green)';
+    } else {
+      result.textContent = 'Log flood failed';
+      result.style.color = 'var(--red)';
+    }
+  }
+
+  // ── Auto traffic ─────────────────────────────────────────
+  const AUTO_FNS = () => {
+    const BRAND_KEYS = brandsData.map(b => b.key);
+    if (!BRAND_KEYS.length) return [];
+    return [
+      ...BRAND_KEYS.map(b => () => createOrder(b)),
+      ...BRAND_KEYS.map(b => () => loyaltyCheck(b)),
+      ...BRAND_KEYS.map(b => () => deliveryEta(b)),
+      ...BRAND_KEYS.map(b => () => getMenu(b)),
+      () => api('GET', '/health', null, null),
+    ];
+  };
+
+  function toggleAuto() {
+    const btn = document.getElementById('autoBtn');
+    const kpi = document.getElementById('kpiAutoStatus');
+    if (autoInterval) {
+      clearInterval(autoInterval);
+      autoInterval = null;
+      btn.textContent = '▶ Start Auto Traffic';
+      btn.classList.remove('running');
+      kpi.textContent = 'OFF';
+      kpi.style.color = 'var(--subtle)';
+    } else {
+      btn.textContent = '⏹ Stop Auto Traffic';
+      btn.classList.add('running');
+      kpi.textContent = 'ON';
+      kpi.style.color = 'var(--green)';
+      autoInterval = setInterval(() => {
+        const fns = AUTO_FNS();
+        if (fns.length) fns[Math.floor(Math.random() * fns.length)]();
+      }, 1500);
+    }
+  }
+
+  // ── Populate selects ─────────────────────────────────────
+  function populateBrandSelects(brands) {
+    ['outage-brand-select', 'slow-brand-select', 'floodBrand'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const current = el.value;
+      const prefix  = id === 'floodBrand' ? '<option value="">All brands</option>' : '<option value="">Select brand…</option>';
+      el.innerHTML  = prefix + brands.map(b => `<option value="${b.key}" ${b.key === current ? 'selected' : ''}>${b.name}</option>`).join('');
+    });
+  }
+
+  // ── Security attack simulations (ASM demo) ───────────────
+  const SEC_PAYLOADS = {
+    sqli:      { path: "/api/security/scan?q=' OR 1=1--&user_id=admin", method: 'GET', body: null, label: 'SQL injection probe' },
+    xss:       { path: "/api/security/scan?q=<script>alert('xss')</script>&user_id=test", method: 'GET', body: null, label: 'XSS probe' },
+    traversal: { path: "/api/security/file?path=../../etc/passwd", method: 'GET', body: null, label: 'Path traversal probe' },
+    login:     { path: "/api/security/login", method: 'POST', body: { username: "admin' OR '1'='1", password: 'password123' }, label: 'Brute-force login attempt' },
+  };
+
+  async function secAttack(type) {
+    const p = SEC_PAYLOADS[type];
+    if (!p) return;
+    addLog('log-warn', null, p.method, p.path.split('?')[0], '→', `ASM probe: ${p.label}`);
+    const res = await api(p.method, p.path, p.body, null);
+    if (window.DD_RUM) {
+      window.DD_RUM.addAction('security_probe', { attack_type: type, label: p.label, status: res.status });
+    }
+  }
+
+  // ── LLM quick-fire (opens chat + sends) ──────────────────
+  async function sendLlmSuggestion(text) {
+    const resultEl = document.getElementById('llmResult');
+    resultEl.style.color = 'var(--subtle)';
+    resultEl.textContent = 'Sending to LLM…';
+    try {
+      const res  = await fetch('/api/chat', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ message: text, brand: 'platform', sessionId: `demo-llm-${Date.now()}` }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        resultEl.style.color = 'var(--green)';
+        resultEl.textContent = `✓ Span created · ${data.usage?.output_tokens ?? '?'} output tokens · Session: ${data.sessionId?.slice(-8)}`;
+        addLog('log-ok', null, 'LLM', '/api/chat', 200, data.message?.slice(0, 120) + '…');
+      } else {
+        resultEl.style.color = 'var(--red)';
+        resultEl.textContent = `Error: ${data.error}`;
+      }
+    } catch (e) {
+      resultEl.style.color = 'var(--red)';
+      resultEl.textContent = `Network error: ${e.message}`;
+    }
+  }
+
+  // ── Boot ─────────────────────────────────────────────────
+  async function init() {
+    await loadBrands();
+    await loadFlags();
+    api('GET', '/health', null, null);
+
+    // Poll every 3s for live updates
+    setInterval(() => { loadBrands(); loadFlags(); }, 3000);
+  }
+
+  // ── DD Assets (quick links) ──────────────────────────────
+  let ddAssets = null;
+
+  async function loadDdAssets() {
+    try {
+      const res = await fetch('/dd-assets.json');
+      if (!res.ok) return;
+      ddAssets = await res.json();
+      // Update exec dashboard link
+      if (ddAssets?.urls?.execDashboard) {
+        document.getElementById('lnkExec').href    = ddAssets.urls.execDashboard;
+        document.getElementById('lnkApmMap').href  = ddAssets.urls.apmMap    || document.getElementById('lnkApmMap').href;
+        document.getElementById('lnkApm').href     = ddAssets.urls.apm       || document.getElementById('lnkApm').href;
+        document.getElementById('lnkMonitors').href= ddAssets.urls.monitors  || document.getElementById('lnkMonitors').href;
+        document.getElementById('lnkCatalog').href = ddAssets.urls.serviceCatalog || document.getElementById('lnkCatalog').href;
+        document.getElementById('lnkSynth').href   = ddAssets.urls.synthetics|| document.getElementById('lnkSynth').href;
+        document.getElementById('lnkLogs').href    = ddAssets.urls.logs      || document.getElementById('lnkLogs').href;
+        document.getElementById('lnkTeams').href   = ddAssets.urls.teams     || document.getElementById('lnkTeams').href;
+        document.getElementById('lnkLlm').href     = ddAssets.urls.llmObs    || document.getElementById('lnkLlm').href;
+      }
+    } catch (e) { /* dd-assets.json not yet generated — links use defaults */ }
+  }
+
+  // ── Chat widget ──────────────────────────────────────────
+  let chatOpen    = false;
+  let chatHistory = [];
+  let chatSession = `demo-${Date.now()}`;
+  let chatBrand   = null;
+
+  const SUGGESTIONS = [
+    "What's the current status of all brands?",
+    "How does Datadog Teams enable brand-level ownership?",
+    "What happens when I trigger a Sonic POS outage?",
+    "Walk me through the tagging strategy",
+    "What monitors were created and what do they alert on?",
+  ];
+
+  function toggleChat() {
+    chatOpen = !chatOpen;
+    const panel = document.getElementById('chatPanel');
+    panel.classList.toggle('open', chatOpen);
+    if (chatOpen && chatHistory.length === 0) renderSuggestions();
+  }
+
+  function renderSuggestions() {
+    const msgs = document.getElementById('chatMessages');
+    msgs.innerHTML = `
+      <div class="chat-msg system"><div class="bubble">Powered by Claude + Datadog LLM Observability. Every message is traced in real time.</div></div>`;
+    const sug = document.createElement('div');
+    sug.className = 'chat-suggestions';
+    sug.id = 'chatSuggestions';
+    sug.innerHTML = SUGGESTIONS.map(s => `<button class="chat-sug" onclick="sendChat(${JSON.stringify(s)})">${s}</button>`).join('');
+    msgs.after(sug);
+  }
+
+  function appendMsg(role, text) {
+    const sugEl = document.getElementById('chatSuggestions');
+    if (sugEl) sugEl.remove();
+    const msgs   = document.getElementById('chatMessages');
+    const div    = document.createElement('div');
+    div.className = `chat-msg ${role}`;
+    div.innerHTML = `<div class="bubble">${text.replace(/\n/g,'<br>')}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function showTyping() {
+    const msgs = document.getElementById('chatMessages');
+    const div  = document.createElement('div');
+    div.id = 'chatTyping';
+    div.className = 'chat-msg assist';
+    div.innerHTML = `<div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function hideTyping() {
+    document.getElementById('chatTyping')?.remove();
+  }
+
+  async function sendChat(text) {
+    const input = document.getElementById('chatInput');
+    const msg   = (text || input.value || '').trim();
+    if (!msg) return;
+    input.value = '';
+    document.getElementById('chatSend').disabled = true;
+
+    appendMsg('user', msg);
+    showTyping();
+
+    try {
+      const res  = await fetch('/api/chat', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ message: msg, brand: chatBrand, sessionId: chatSession }),
+      });
+      const data = await res.json();
+      hideTyping();
+      if (res.ok) {
+        appendMsg('assist', data.message);
+        chatHistory.push({ role: 'user', content: msg }, { role: 'assistant', content: data.message });
+      } else {
+        appendMsg('system', `Error: ${data.error || 'Chat unavailable'}`);
+      }
+    } catch (e) {
+      hideTyping();
+      appendMsg('system', `Network error: ${e.message}`);
+    }
+
+    document.getElementById('chatSend').disabled = false;
+    document.getElementById('chatInput').focus();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement.id === 'chatInput' && !e.shiftKey) {
+      e.preventDefault(); sendChat();
+    }
+  });
+
+  async function init() {
+    await loadDdAssets();
+    await loadBrands();
+    await loadFlags();
+    api('GET', '/health', null, null);
+    setInterval(() => { loadBrands(); loadFlags(); }, 3000);
+  }
+
+  init();
+</script>
+
+<!-- ── Chat widget ── -->
+<button id="chatBtn" onclick="toggleChat()" title="Inspire Brands AI Assistant">🤖</button>
+
+<div id="chatPanel">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="title">Inspire Brands Assistant</div>
+      <div class="sub">Context-aware · Live platform state</div>
+      <div class="llm-badge">✦ Datadog LLM Observability</div>
+    </div>
+    <button class="chat-close" onclick="toggleChat()">✕</button>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input-row">
+    <input id="chatInput" placeholder="Ask about the platform, brands, or Datadog…" />
+    <button id="chatSend" onclick="sendChat()">Send</button>
+  </div>
+</div>
+</body>
+</html>

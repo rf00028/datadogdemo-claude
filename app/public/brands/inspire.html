@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inspire Brands — Digital Experience Portal</title>
+  <script src="https://www.datadoghq-browser-agent.com/us1/v5/datadog-rum.js" type="text/javascript"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f0f1a;color:#fff;min-height:100vh}
+
+    /* Header */
+    .header{background:linear-gradient(135deg,#1a0533,#0d1b4d);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08)}
+    .header-logo{display:flex;align-items:center;gap:12px}
+    .inspire-logo{height:40px;object-fit:contain}
+    .header-title{font-size:13px;color:rgba(255,255,255,.5);margin-top:2px}
+    .header-status{display:flex;align-items:center;gap:6px;font-size:13px;color:#4ade80}
+    .status-dot{width:8px;height:8px;background:#4ade80;border-radius:50%;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+
+    /* Platform bar */
+    .platform-bar{background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06);padding:12px 24px;display:flex;gap:24px;overflow-x:auto}
+    .platform-metric{text-align:center;min-width:80px}
+    .platform-metric .val{font-size:20px;font-weight:700;color:#fff}
+    .platform-metric .lbl{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+    /* Hero */
+    .hero{text-align:center;padding:40px 24px 32px;background:linear-gradient(180deg,rgba(99,44,166,.15) 0%,transparent 100%)}
+    .hero h1{font-size:28px;font-weight:800;background:linear-gradient(135deg,#fff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+    .hero p{font-size:15px;color:rgba(255,255,255,.5);max-width:480px;margin:0 auto}
+
+    /* Brand grid */
+    .section{padding:0 20px 32px}
+    .section-title{font-size:13px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;padding-top:24px}
+    .brand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .brand-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;cursor:pointer;transition:.2s;text-decoration:none;color:inherit;display:block;position:relative;overflow:hidden}
+    .brand-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--brand-color);transition:.2s}
+    .brand-card:hover{background:rgba(255,255,255,.09);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    .brand-card-logo{width:48px;height:48px;object-fit:contain;border-radius:10px;margin-bottom:10px;background:rgba(255,255,255,.1);padding:4px}
+    .brand-card-name{font-size:14px;font-weight:700;margin-bottom:4px}
+    .brand-card-tagline{font-size:11px;color:rgba(255,255,255,.4);line-height:1.4;margin-bottom:10px}
+    .brand-status-row{display:flex;align-items:center;justify-content:space-between}
+    .brand-status{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600}
+    .status-indicator{width:7px;height:7px;border-radius:50%}
+    .status-indicator.healthy{background:#4ade80;animation:pulse 2s infinite}
+    .status-indicator.degraded{background:#fbbf24}
+    .status-indicator.outage{background:#f87171;animation:pulse 1s infinite}
+    .visit-btn{font-size:11px;font-weight:600;color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);padding:3px 8px;border-radius:20px}
+    .brand-orders{font-size:11px;color:rgba(255,255,255,.35);margin-top:6px}
+
+    /* DD section */
+    .dd-section{margin:0 20px 32px;background:rgba(99,44,166,.12);border:1px solid rgba(99,44,166,.3);border-radius:14px;padding:20px}
+    .dd-section h3{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .dd-links{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+    .dd-link{background:rgba(99,44,166,.2);border:1px solid rgba(99,44,166,.3);border-radius:8px;padding:10px 12px;text-decoration:none;color:#c4b5fd;font-size:12px;font-weight:600;transition:.15s;display:flex;align-items:center;gap:6px}
+    .dd-link:hover{background:rgba(99,44,166,.4);color:#fff}
+
+    /* Footer */
+    .footer{text-align:center;padding:24px;font-size:12px;color:rgba(255,255,255,.2)}
+
+    /* DD RUM badge */
+    .rum-badge{position:fixed;bottom:16px;right:16px;background:#632ca6;color:#fff;border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(99,44,166,.5);z-index:200;cursor:pointer;text-decoration:none}
+    .rum-dot{width:7px;height:7px;background:#52c41a;border-radius:50%;animation:pulse 2s infinite}
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">
+    <img class="inspire-logo" id="inspireLogo" src="https://inspirebrands.com/wp-content/uploads/2022/06/Inspire-Brands-Logo-with-Portfolio.png" alt="Inspire Brands">
+    <div class="header-title">Digital Experience Portal</div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Loading…</span>
+  </div>
+</div>
+
+<div class="platform-bar" id="platformBar">
+  <div class="platform-metric"><div class="val" id="totalOrders">—</div><div class="lbl">Total Orders</div></div>
+  <div class="platform-metric"><div class="val" id="totalRevenue">—</div><div class="lbl">Revenue</div></div>
+  <div class="platform-metric"><div class="val" id="healthyBrands">—</div><div class="lbl">Healthy Brands</div></div>
+  <div class="platform-metric"><div class="val" id="totalErrors">—</div><div class="lbl">Errors</div></div>
+  <div class="platform-metric"><div class="val">6</div><div class="lbl">Brands</div></div>
+  <div class="platform-metric"><div class="val">19</div><div class="lbl">APM Services</div></div>
+</div>
+
+<div class="hero">
+  <h1>Our Family of Brands</h1>
+  <p>Explore each brand's digital experience — real-time data, live feature flags, and Datadog observability at every layer.</p>
+</div>
+
+<div class="section">
+  <div class="section-title">Brand Storefronts</div>
+  <div class="brand-grid" id="brandGrid">
+    <!-- populated by JS -->
+  </div>
+</div>
+
+<div class="dd-section">
+  <h3>🐶 Datadog Observability</h3>
+  <div class="dd-links" id="ddLinks">
+    <!-- populated from dd-assets.json -->
+  </div>
+</div>
+
+<div class="footer">Inspire Brands Digital Platform · Powered by Datadog Observability</div>
+
+<a class="rum-badge" id="ddLink" href="https://app.datadoghq.com/rum/explorer?query=service%3Ainspire-global-web" target="_blank">
+  <span class="rum-dot"></span> LIVE in Datadog RUM
+</a>
+
+<script>
+const BRAND_LOGOS = {
+  arbys:           'https://inspirebrands.com/wp-content/uploads/2017/10/Arbys.jpg',
+  bww:             'https://inspirebrands.com/wp-content/uploads/2018/08/Buffalo-Wild-Wings-Logo-Horizontal.jpg',
+  sonic:           'https://inspirebrands.com/wp-content/uploads/2020/02/Sonic_Logo-1-scaled.jpg',
+  dunkin:          'https://inspirebrands.com/wp-content/uploads/2021/06/Dunkin_Donuts_logo.png',
+  'baskin-robbins':'https://inspirebrands.com/wp-content/uploads/2022/04/IB_BROnlineStamp-01.png',
+  'jimmy-johns':   'https://inspirebrands.com/wp-content/uploads/2023/10/JJ-Red-2.png',
+};
+
+const DD_LINK_CONFIG = [
+  { key:'globalDashboard', label:'Global Dashboard', icon:'📊' },
+  { key:'execDashboard',   label:'Exec Dashboard',   icon:'📈' },
+  { key:'apmMap',          label:'APM Service Map',   icon:'🗺️' },
+  { key:'monitors',        label:'All Monitors',      icon:'🔔' },
+  { key:'slos',            label:'SLOs',              icon:'🎯' },
+  { key:'logs',            label:'Logs',              icon:'📋' },
+  { key:'teams',           label:'Teams',             icon:'👥' },
+  { key:'llmObs',          label:'LLM Observability', icon:'🤖' },
+  { key:'costManagement',  label:'Cost Management',   icon:'💰' },
+];
+
+async function initRUM() {
+  try {
+    const assets = await fetch('/dd-assets.json').then(r => r.json());
+    const rumCfg = assets.rum?.['global'];
+    if (rumCfg && window.DD_RUM) {
+      DD_RUM.init({
+        applicationId:          rumCfg.applicationId,
+        clientToken:            rumCfg.clientToken,
+        site:                   'datadoghq.com',
+        service:                'inspire-global-web',
+        env:                    'local',
+        version:                '1.0.0',
+        sessionSampleRate:      100,
+        sessionReplaySampleRate:100,
+        trackUserInteractions:  true,
+        trackResources:         true,
+        trackLongTasks:         true,
+        defaultPrivacyLevel:    'allow',
+      });
+      DD_RUM.setGlobalContextProperty('brand', 'global');
+      DD_RUM.setGlobalContextProperty('brand.name', 'Inspire Brands Portal');
+      DD_RUM.setGlobalContextProperty('team', 'inspire-platform');
+      DD_RUM.startView({ name: 'inspire-portal' });
+    }
+
+    // Populate DD links
+    const linksEl = document.getElementById('ddLinks');
+    DD_LINK_CONFIG.forEach(cfg => {
+      const url = assets.urls?.[cfg.key];
+      if (!url) return;
+      const a = document.createElement('a');
+      a.className = 'dd-link';
+      a.href = url;
+      a.target = '_blank';
+      a.innerHTML = `${cfg.icon} ${cfg.label}`;
+      a.onclick = () => DD_RUM?.addAction('dd_link_click', { link: cfg.key });
+      linksEl.appendChild(a);
+    });
+
+    return assets;
+  } catch(e) { return {}; }
+}
+
+async function loadPlatformData() {
+  const [brandsData, assets] = await Promise.all([
+    fetch('/api/brands').then(r => r.json()),
+    initRUM(),
+  ]);
+
+  const { brands, platform } = brandsData;
+
+  // Platform bar
+  document.getElementById('totalOrders').textContent  = platform.totalOrders.toLocaleString();
+  document.getElementById('totalRevenue').textContent = `$${platform.totalRevenue.toFixed(0)}`;
+  const healthyCount = brands.filter(b => b.status === 'healthy').length;
+  document.getElementById('healthyBrands').textContent = `${healthyCount}/6`;
+  document.getElementById('totalErrors').textContent   = platform.totalErrors;
+
+  // Header status
+  const allHealthy = brands.every(b => b.status === 'healthy');
+  const anyOutage  = brands.some(b => b.status === 'outage');
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (anyOutage) {
+    dot.style.background = '#f87171'; txt.textContent = 'Incident Active';
+    txt.style.color = '#f87171';
+  } else if (!allHealthy) {
+    dot.style.background = '#fbbf24'; txt.textContent = 'Degraded Performance';
+    txt.style.color = '#fbbf24';
+  } else {
+    txt.textContent = 'All Systems Operational';
+  }
+
+  // Brand grid
+  const grid = document.getElementById('brandGrid');
+  grid.innerHTML = '';
+  brands.forEach(brand => {
+    const statusIcon  = { healthy:'🟢', degraded:'🟡', outage:'🔴' }[brand.status] || '🟢';
+    const statusClass = brand.status || 'healthy';
+    const card = document.createElement('a');
+    card.className = 'brand-card';
+    card.href = `/brands/${brand.key}`;
+    card.style.setProperty('--brand-color', brand.color);
+    card.innerHTML = `
+      <img class="brand-card-logo" src="${BRAND_LOGOS[brand.key]||''}" alt="${brand.name}" onerror="this.style.display='none'">
+      <div class="brand-card-name">${brand.name}</div>
+      <div class="brand-card-tagline">${brand.tagline}</div>
+      <div class="brand-status-row">
+        <div class="brand-status">
+          <div class="status-indicator ${statusClass}"></div>
+          <span>${brand.status === 'outage' ? 'Outage' : brand.status === 'degraded' ? 'Degraded' : 'Healthy'}</span>
+        </div>
+        <span class="visit-btn">Visit →</span>
+      </div>
+      <div class="brand-orders">${brand.metrics.totalOrders} orders today</div>`;
+    card.onclick = () => window.DD_RUM?.addAction('brand_card_click', { brand: brand.key, status: brand.status });
+    grid.appendChild(card);
+  });
+}
+
+// Refresh every 10s
+loadPlatformData();
+setInterval(loadPlatformData, 10000);
+</script>
+</body>
+</html>

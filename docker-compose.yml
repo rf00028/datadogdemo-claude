@@ -1,0 +1,66 @@
+services:
+
+  # ── Application ──────────────────────────────────────────────────────────────
+  # Uses the Datadog agent already running natively on your Mac.
+  # Docker Desktop exposes the host at host.docker.internal.
+  app:
+    build: .
+    container_name: inspire-brands-platform
+    restart: unless-stopped
+    environment:
+      PORT:           3000
+      DD_ENV:         ${DD_ENV:-local}
+      DD_VERSION:     ${DD_VERSION:-1.0.0}
+      DD_SERVICE:     inspire-brands-platform
+
+      # API key — used by datadog-winston to ship logs directly to DD intake
+      DD_API_KEY:          ${DD_API_KEY}
+
+      # Point to the native Datadog agent on the Mac host
+      DD_AGENT_HOST:       host.docker.internal
+      DD_TRACE_AGENT_PORT: 8126
+      DD_DOGSTATSD_HOST:   host.docker.internal
+      DD_DOGSTATSD_PORT:   8125
+
+      # Unified Service Tagging + brand context
+      DD_TAGS:        "env:${DD_ENV:-local},version:${DD_VERSION:-1.0.0},service:inspire-brands-platform"
+
+      # Log injection (correlates logs with APM traces)
+      DD_LOGS_INJECTION: "true"
+
+      # Application Security Management
+      DD_APPSEC_ENABLED:          "true"
+      DD_APPSEC_WAF_TIMEOUT:      "5ms"
+      DD_IAST_ENABLED:            "true"
+
+      # Anthropic key — powers LLM Observability demo chatbot
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      # Live-mount public/ so dd-assets.json updates without rebuild
+      - ./app/public:/app/public:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      com.datadoghq.ad.logs: >-
+        [{"source": "nodejs", "service": "inspire-brands-platform"}]
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Datadog Private Location ─────────────────────────────────────────────────
+  # Runs synthetic tests against http://app:3000 (internal Docker network)
+  private-location:
+    image: gcr.io/datadoghq/synthetics-private-location-worker
+    platform: linux/amd64   # no ARM64 build — runs under Rosetta on Apple Silicon
+    container_name: dd-private-location
+    restart: unless-stopped
+    volumes:
+      - ./private-location-config.json:/etc/datadog/synthetics-check-runner.json:ro
+    depends_on:
+      - app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
