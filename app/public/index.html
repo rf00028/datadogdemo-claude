@@ -1183,8 +1183,11 @@
     msgs.innerHTML = `
       <div class="chat-msg system"><div class="bubble">Powered by Claude + Datadog LLM Observability. Every message is traced in real time.</div></div>
       <div class="chat-suggestions" id="chatSuggestions">
-        ${SUGGESTIONS.map(s => `<button class="chat-sug" onclick="sendChat(${JSON.stringify(s)})">${s}</button>`).join('')}
+        ${SUGGESTIONS.map((s, i) => `<button class="chat-sug" data-idx="${i}">${s}</button>`).join('')}
       </div>`;
+    msgs.querySelectorAll('.chat-sug').forEach((btn, i) => {
+      btn.addEventListener('click', () => sendChat(SUGGESTIONS[i]));
+    });
   }
 
   function appendMsg(role, text) {
