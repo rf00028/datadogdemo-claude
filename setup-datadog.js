@@ -87,7 +87,36 @@ function ddRequest(method, urlPath, body) {
 
 const created = { teams: [], monitors: [], synthetics: [], dashboards: [] };
 
+// Names of already-existing resources — loaded at startup to prevent duplicates
+let existingMonitorNames  = new Set();
+let existingSyntheticNames = new Set();
+
+async function loadExistingResources() {
+  try {
+    const [monRes, synRes] = await Promise.all([
+      ddRequest('GET', '/api/v1/monitor?page_size=200', null),
+      ddRequest('GET', '/api/v1/synthetics/tests?page_size=200', null),
+    ]);
+    if (Array.isArray(monRes.data))                          monRes.data.forEach(m => existingMonitorNames.add(m.name));
+    if (Array.isArray(synRes.data?.tests))   synRes.data.tests.forEach(t => existingSyntheticNames.add(t.name));
+    console.log(`  ℹ  Existing: ${existingMonitorNames.size} monitors, ${existingSyntheticNames.size} synthetic tests\n`);
+  } catch (e) {
+    console.log(`  ⚠  Could not pre-load existing resources: ${e.message}\n`);
+  }
+}
+
 async function create(label, method, urlPath, body, bucket) {
+  // Skip if a resource with this name already exists
+  const resourceName = body?.name;
+  if (resourceName) {
+    const isMonitor   = urlPath.includes('/monitor')    && existingMonitorNames.has(resourceName);
+    const isSynthetic = urlPath.includes('/synthetics') && existingSyntheticNames.has(resourceName);
+    if (isMonitor || isSynthetic) {
+      console.log(`  ${label}... ⏭  already exists — skipping`);
+      return null;
+    }
+  }
+
   process.stdout.write(`  ${label}... `);
   try {
     const res = await ddRequest(method, urlPath, body);
@@ -120,6 +149,10 @@ async function main() {
   console.log(`  Site:    https://app.${SITE}`);
   console.log(`  Service: ${SERVICE}  •  Env: ${ENV_TAG}`);
   console.log(`  Brands:  ${BRANDS.map(b => b.key).join(', ')}\n`);
+
+  // Pre-load existing resources to prevent duplicates on re-runs
+  console.log('─── Checking for existing resources ────────────────────────\n');
+  await loadExistingResources();
 
   // ── TEAMS ──────────────────────────────────────────────────────────────────
   console.log('─── Teams ──────────────────────────────────────────────────\n');
@@ -175,11 +208,11 @@ async function main() {
       {
         name:    `${prefix} POS Error Rate — > 5 errors in 5m`,
         type:    'query alert',
-        query:   `sum(last_5m):sum:${METRIC}.pos.errors{${tag}}.as_count() > 5`,
+        query:   `sum(last_5m):default_zero(sum:${METRIC}.pos.errors{${tag}}.as_count()) > 3`,
         message: `🔴 **${brand.name}** POS is logging {{value}} errors in 5 minutes.\n\nThis may indicate a POS outage or payment gateway issue.\n\n[View APM Traces](https://app.${SITE}/apm/traces?query=service:${SERVICE}+brand:${brand.key}+status:error) ${NOTIFY}`,
         tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, tag, team, 'monitor_type:errors', 'brand_monitor:true'],
         options: {
-          thresholds:     { critical: 5, warning: 2 },
+          thresholds:     { critical: 3, warning: 1 },
           notify_no_data: false,
           include_tags:   true,
           renotify_interval: 30,
@@ -236,10 +269,10 @@ async function main() {
     {
       name:    `[${SERVICE}] Platform-Wide Error Rate — All Brands`,
       type:    'query alert',
-      query:   `sum(last_5m):sum:${METRIC}.http.requests{service:${SERVICE},status:500}.as_count() > 20`,
+      query:   `sum(last_5m):default_zero(sum:${METRIC}.http.requests{service:${SERVICE},status:500}.as_count()) > 10`,
       message: `🚨 **${CUSTOMER.company} Platform** is seeing **{{value}} HTTP 500 errors** across all brands in 5 minutes.\n\nThis is a platform-level event — investigate shared infrastructure (loyalty service, delivery gateway, database).\n\n[APM Overview](https://app.${SITE}/apm/services?env=${ENV_TAG}) ${NOTIFY}`,
       tags:    [`service:${SERVICE}`, `env:${ENV_TAG}`, `team:${CUSTOMER.platformTeam}`, 'monitor_type:platform'],
-      options: { thresholds: { critical: 20, warning: 10 }, notify_no_data: false, include_tags: true },
+      options: { thresholds: { critical: 10, warning: 5 }, notify_no_data: false, include_tags: true },
     },
     created.monitors
   );
@@ -714,10 +747,11 @@ async function main() {
       type:             'web',
       tier:             'High',
       languages:        ['JavaScript'],
-      tags:             [`team:${CUSTOMER.platformTeam}`, 'env:local'],
+      tags:             [`team:${CUSTOMER.platformTeam}`, 'env:local', `cost_center:${SERVICE}`, 'business_unit:platform'],
       links: [
         { name: 'Exec Dashboard', type: 'dashboard', url: `https://app.${SITE}/dashboard/${dashIds.platform || ''}` },
         { name: 'APM Service',    type: 'other',     url: `https://app.${SITE}/apm/services/${SERVICE}?env=${ENV_TAG}` },
+        { name: 'Profiles',       type: 'other',     url: `https://app.${SITE}/profiling?service=${SERVICE}&env=${ENV_TAG}` },
       ],
       contacts: [],
     },
@@ -758,10 +792,11 @@ async function main() {
           type:             'web',
           tier:             'High',
           languages:        ['JavaScript'],
-          tags:             [`team:${brand.team}`, `brand:${brand.key}`, 'env:local'],
+          tags:             [`team:${brand.team}`, `brand:${brand.key}`, 'env:local', `cost_center:${brand.key}`, `business_unit:${brand.key}`],
           links: [
             { name: svc.linkName, type: 'dashboard', url: `https://app.${SITE}/dashboard/${dashId}` },
             { name: 'APM Traces', type: 'other',     url: `https://app.${SITE}/apm/traces?query=service:${ddService}+env:${ENV_TAG}` },
+            { name: 'Profiles',   type: 'other',     url: `https://app.${SITE}/profiling?service=${ddService}&env=${ENV_TAG}` },
           ],
           contacts: [],
         },

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RUM Warmup — Inspire Brands</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f1a; color: #e2e8f0; min-height: 100vh; padding: 24px; }
+    h1 { font-size: 22px; font-weight: 800; color: #a78bfa; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    .progress-bar-wrap { background: #1e1e2e; border-radius: 8px; height: 8px; margin-bottom: 24px; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #7c3aed, #a78bfa); border-radius: 8px; transition: width 0.4s ease; width: 0%; }
+    .brands-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+    .brand-card { background: #1e1e2e; border-radius: 10px; padding: 14px 16px; border: 2px solid #2d2d3e; transition: border-color 0.2s; }
+    .brand-card.active { border-color: #7c3aed; }
+    .brand-card.done { border-color: #22c55e; }
+    .brand-card.error { border-color: #ef4444; }
+    .brand-card-name { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .brand-card-status { font-size: 12px; color: #64748b; }
+    .brand-card.active .brand-card-status { color: #a78bfa; }
+    .brand-card.done .brand-card-status { color: #22c55e; }
+    .brand-card.error .brand-card-status { color: #ef4444; }
+    .step-log { background: #1e1e2e; border-radius: 10px; padding: 14px 16px; max-height: 280px; overflow-y: auto; font-family: monospace; font-size: 12px; line-height: 1.7; }
+    .log-line { color: #94a3b8; }
+    .log-line.ok { color: #22c55e; }
+    .log-line.active { color: #a78bfa; }
+    .log-line.warn { color: #f59e0b; }
+    .log-line.err { color: #ef4444; }
+    .summary { margin-top: 16px; background: #1e1e2e; border-radius: 10px; padding: 16px; display: none; }
+    .summary h2 { font-size: 16px; font-weight: 700; color: #22c55e; margin-bottom: 8px; }
+    .summary p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+    iframe { position: fixed; bottom: -9999px; right: -9999px; width: 390px; height: 844px; border: none; opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+<h1>RUM Warmup</h1>
+<p class="subtitle">Visits each brand app page and simulates real user interactions to populate Datadog RUM.</p>
+
+<div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+
+<div class="brands-grid" id="brandsGrid"></div>
+<div class="step-log" id="stepLog"></div>
+<div class="summary" id="summary">
+  <h2>Warmup Complete</h2>
+  <p id="summaryText"></p>
+</div>
+
+<iframe id="brandFrame" src="about:blank"></iframe>
+
+<script>
+const BRANDS = [
+  { key: 'arbys',          name: "Arby's" },
+  { key: 'bww',            name: 'Buffalo Wild Wings' },
+  { key: 'sonic',          name: 'Sonic' },
+  { key: 'dunkin',         name: "Dunkin'" },
+  { key: 'baskin-robbins', name: 'Baskin-Robbins' },
+  { key: 'jimmy-johns',    name: "Jimmy John's" },
+];
+
+const frame   = document.getElementById('brandFrame');
+const logEl   = document.getElementById('stepLog');
+const progBar = document.getElementById('progressBar');
+let   done    = 0;
+
+function log(msg, type = '') {
+  const d = document.createElement('div');
+  d.className = 'log-line' + (type ? ' ' + type : '');
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setCardState(key, state, status) {
+  const card = document.getElementById('card-' + key);
+  if (!card) return;
+  card.className = 'brand-card ' + state;
+  card.querySelector('.brand-card-status').textContent = status;
+}
+
+async function waitForLoad(src, timeoutMs = 12000) {
+  return new Promise(resolve => {
+    const t = setTimeout(() => { frame.onload = null; resolve('timeout'); }, timeoutMs);
+    frame.onload = () => { clearTimeout(t); frame.onload = null; resolve('loaded'); };
+    frame.src = src;
+  });
+}
+
+async function simulateInteractions(key) {
+  const win = frame.contentWindow;
+  const doc = frame.contentDocument;
+  if (!win || !doc) return;
+
+  // Switch tabs to generate view events
+  const tabs = ['cart', 'loyalty', 'delivery', 'menu'];
+  for (const tab of tabs) {
+    const btn = doc.querySelector(`[data-tab="${tab}"]`);
+    if (btn) {
+      btn.click();
+      // Also call switchTab if available (triggers RUM action)
+      try { win.switchTab?.(tab); } catch(_) {}
+    }
+    await sleep(600);
+  }
+
+  // Trigger loyalty lookup (generates fetch + RUM action)
+  try {
+    const input  = doc.getElementById('loyaltyInput');
+    const lookup = doc.querySelector('.lookup-btn');
+    if (input && lookup) {
+      input.value = 'warmup-user-' + Math.floor(Math.random() * 99);
+      lookup.click();
+      await sleep(800);
+    }
+  } catch(_) {}
+
+  // Trigger delivery ETA (generates fetch + RUM action)
+  try {
+    doc.querySelector('[data-tab="delivery"]')?.click();
+    await sleep(400);
+    const etaBtn = doc.querySelector('.eta-btn');
+    if (etaBtn) { etaBtn.click(); await sleep(800); }
+  } catch(_) {}
+
+  // Click a few menu items to simulate adding to cart
+  try {
+    doc.querySelector('[data-tab="menu"]')?.click();
+    await sleep(400);
+    const addBtns = doc.querySelectorAll('.add-btn');
+    for (let i = 0; i < Math.min(3, addBtns.length); i++) {
+      addBtns[i].click();
+      await sleep(300);
+    }
+  } catch(_) {}
+
+  // Place an order via API (also generates server-side telemetry)
+  try {
+    await fetch(`/api/${key}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: 'drive-thru', items: ['warmup-item'] }),
+    });
+  } catch(_) {}
+}
+
+async function warmupBrand(brand, index) {
+  setCardState(brand.key, 'active', 'Loading…');
+  log(`Loading ${brand.name} app…`, 'active');
+
+  const result = await waitForLoad(`/brands/${brand.key}`, 14000);
+  if (result === 'timeout') {
+    log(`${brand.name} — load timeout`, 'warn');
+    setCardState(brand.key, 'error', 'Load timeout');
+  } else {
+    log(`${brand.name} — loaded`, 'ok');
+    await sleep(1200); // let RUM SDK init + first view fire
+
+    log(`${brand.name} — simulating interactions…`, 'active');
+    try {
+      await simulateInteractions(brand.key);
+      log(`${brand.name} — interactions done`, 'ok');
+    } catch(e) {
+      log(`${brand.name} — interaction error: ${e.message}`, 'warn');
+    }
+
+    // Extra dwell time so RUM flushes buffered events
+    await sleep(2500);
+    setCardState(brand.key, 'done', 'RUM events sent');
+  }
+
+  done++;
+  progBar.style.width = `${Math.round((done / BRANDS.length) * 100)}%`;
+}
+
+async function run() {
+  // Build brand cards
+  const grid = document.getElementById('brandsGrid');
+  BRANDS.forEach(b => {
+    grid.innerHTML += `
+      <div class="brand-card" id="card-${b.key}">
+        <div class="brand-card-name">${b.name}</div>
+        <div class="brand-card-status">Waiting…</div>
+      </div>`;
+  });
+
+  log('Starting RUM warmup for all 6 brands…');
+
+  // Run brands sequentially (RUM SDK needs one iframe at a time)
+  for (let i = 0; i < BRANDS.length; i++) {
+    await warmupBrand(BRANDS[i], i);
+    await sleep(500); // brief pause between brands
+  }
+
+  // Reset iframe
+  frame.src = 'about:blank';
+
+  log('All brands done — RUM data is flowing into Datadog.', 'ok');
+  log('Sessions, page views, actions, and resources should appear in ~30s.', 'ok');
+
+  const summaryEl = document.getElementById('summary');
+  summaryEl.style.display = 'block';
+  document.getElementById('summaryText').textContent =
+    `Visited all 6 brand apps and simulated ${BRANDS.length * 6}+ user interactions. ` +
+    `RUM sessions, page views, and resource traces will appear in Datadog RUM explorer ` +
+    `for each inspire-{brand}-web service within 30–60 seconds. ` +
+    `Re-open this page periodically to keep building session history.`;
+
+  progBar.style.width = '100%';
+}
+
+run();
+</script>
+</body>
+</html>

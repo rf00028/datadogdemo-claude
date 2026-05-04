@@ -455,7 +455,7 @@ async function createGlobalDashboard(sloIds) {
         precision:   2,
         requests: [{
           formulas: [{ formula: 'a' }],
-          queries:  [{ query: `sum:inspire.orders.value{env:${ENV_TAG}}.as_count()`, data_source: 'metrics', name: 'a', aggregator: 'sum' }],
+          queries:  [{ query: `sum:inspire.orders.revenue{env:${ENV_TAG}}.as_count()`, data_source: 'metrics', name: 'a', aggregator: 'sum' }],
           response_format: 'scalar',
         }],
         custom_unit: '$',
@@ -493,7 +493,7 @@ async function createGlobalDashboard(sloIds) {
         precision:   0,
         requests: [{
           formulas: [{ formula: 'a' }],
-          queries:  [{ query: `p95:inspire.pos.processing_time{env:${ENV_TAG}}`, data_source: 'metrics', name: 'a', aggregator: 'percentile' }],
+          queries:  [{ query: `avg:inspire.pos.processing_time.95percentile{env:${ENV_TAG}}`, data_source: 'metrics', name: 'a', aggregator: 'avg' }],
           response_format: 'scalar',
           conditional_formats: [
             { comparator: '>', value: 800, palette: 'white_on_red'    },

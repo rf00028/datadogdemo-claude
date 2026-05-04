@@ -7,11 +7,11 @@ const tracer = require('dd-trace').init({
   version: process.env.DD_VERSION || '1.0.0',
   logInjection: true,
   runtimeMetrics: true,
-  profiling: false,
+  profiling: true,
 });
 
 const ddTrace = require('dd-trace');
-const LLMObs  = ddTrace.LLMObs;
+const LLMObs  = ddTrace.llmobs;
 
 const express        = require('express');
 const path           = require('path');
@@ -25,7 +25,12 @@ let   Anthropic     = null;
 
 // Enable LLMObs — guard in case dd-trace version doesn't export it
 if (LLMObs && typeof LLMObs.enable === 'function') {
-  LLMObs.enable({ mlApp: CUSTOMER.mlApp, agentlessEnabled: false });
+  LLMObs.enable({
+    mlApp:            CUSTOMER.mlApp,
+    agentlessEnabled: true,
+    apiKey:           process.env.DD_API_KEY,
+    site:             process.env.DD_SITE || 'datadoghq.com',
+  });
 }
 
 if (ANTHROPIC_KEY) {
@@ -103,6 +108,12 @@ for (const brand of BRAND_KEYS) {
     enabled:     false,
     description: `Slow POS for ${BRANDS[brand].name} — 3× transaction latency`,
     impact:      'latency',
+    brand,
+  };
+  FLAGS[`${brand}-chaos`] = {
+    enabled:     false,
+    description: `☢ Full chaos for ${BRANDS[brand].name} — POS outage + slow POS + loyalty down + delivery down + synthetics fail`,
+    impact:      'critical',
     brand,
   };
 }
@@ -199,9 +210,10 @@ app.get('/api/brands', (req, res) => {
   const result = BRAND_KEYS.map(key => {
     const b   = BRANDS[key];
     const m   = brandMetrics[key];
+    const chaos  = FLAGS[`${key}-chaos`]?.enabled;
     const outage = FLAGS[`${key}-pos-outage`].enabled;
     const slow   = FLAGS[`${key}-slow-pos`].enabled;
-    const status = outage ? 'outage' : slow ? 'degraded' : 'healthy';
+    const status = chaos ? 'chaos' : outage ? 'outage' : slow ? 'degraded' : 'healthy';
     return {
       key,
       name:     b.name,
@@ -303,6 +315,7 @@ app.post('/api/:brand/orders', async (req, res) => {
     });
 
     dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`]);
+    dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`]);
     dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`]);
     dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slowPos}`]);
 
@@ -327,6 +340,7 @@ app.get('/api/:brand/loyalty/:userId', async (req, res) => {
 
   const b        = BRANDS[brand];
   const degraded = evalFlag('loyalty-degraded');
+  const chaos    = FLAGS[`${brand}-chaos`]?.enabled;
   tagBrand(brand);
   brandMetrics[brand].loyaltyLookups++;
 
@@ -339,6 +353,15 @@ app.get('/api/:brand/loyalty/:userId', async (req, res) => {
     span.setTag('brand',    brand);
     span.setTag('team',     b.team);
     span.setTag('degraded', degraded);
+    span.setTag('chaos',    chaos);
+
+    if (chaos) {
+      brandMetrics[brand].errors++;
+      span.setTag('error', true);
+      dogstatsd.increment('loyalty.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'error_type:chaos']);
+      logger.error('loyalty.chaos', { brand, team: b.team, userId, message: 'Loyalty unavailable — chaos mode active' });
+      return res.status(503).json({ error: 'Service unavailable — critical incident in progress', chaos: true });
+    }
 
     const baseMs  = Math.floor(Math.random() * 200) + 20;
     const delayMs = degraded ? baseMs * 4 + Math.floor(Math.random() * 400) : baseMs;
@@ -371,8 +394,9 @@ app.get('/api/:brand/delivery/estimate', async (req, res) => {
   const { brand } = req.params;
   if (!BRANDS[brand]) return res.status(404).json({ error: `Unknown brand: ${brand}` });
 
-  const b    = BRANDS[brand];
+  const b     = BRANDS[brand];
   const surge = evalFlag('delivery-surge');
+  const chaos = FLAGS[`${brand}-chaos`]?.enabled;
   tagBrand(brand);
 
   // Child span surfaces as {servicePrefix}-{brand}-delivery in APM service map
@@ -384,6 +408,13 @@ app.get('/api/:brand/delivery/estimate', async (req, res) => {
     span.setTag('brand',  brand);
     span.setTag('team',   b.team);
     span.setTag('surge',  surge);
+    span.setTag('chaos',  chaos);
+
+    if (chaos) {
+      span.setTag('error', true);
+      logger.error('delivery.chaos', { brand, team: b.team, message: 'Delivery unavailable — chaos mode active' });
+      return res.status(503).json({ error: 'Delivery service unavailable — critical incident in progress', chaos: true });
+    }
 
     const baseEta = Math.floor(Math.random() * 15) + 20;
     const eta     = surge ? Math.floor(baseEta * 3) : baseEta;
@@ -467,6 +498,27 @@ app.post('/api/flags/:name/toggle', (req, res) => {
   const newValue = FLAGS[name].enabled;
   const flag     = FLAGS[name];
 
+  // Chaos cascade: flip pos-outage + slow-pos together, and burst metrics to fire monitors immediately
+  if (name.endsWith('-chaos')) {
+    const brand = name.replace('-chaos', '');
+    if (FLAGS[`${brand}-pos-outage`]) FLAGS[`${brand}-pos-outage`].enabled = newValue;
+    if (FLAGS[`${brand}-slow-pos`])   FLAGS[`${brand}-slow-pos`].enabled   = newValue;
+    if (BRANDS[brand]) {
+      const b = BRANDS[brand];
+      if (newValue) {
+        for (let i = 0; i < 12; i++) {
+          dogstatsd.increment('pos.errors',    1, [`brand:${brand}`, `team:${b.team}`, 'error_type:chaos']);
+          dogstatsd.increment('http.requests', 1, [`status:500`, `method:POST`, `brand:${brand}`, `team:${b.team}`]);
+          // High latency values so p95 latency monitor fires (chaos returns 503 before the normal histogram runs)
+          dogstatsd.histogram('pos.processing_time', 3000 + Math.floor(Math.random() * 3000), [`brand:${brand}`, `team:${b.team}`, 'slow_pos:true', 'error_type:chaos']);
+        }
+        logger.error('chaos.activated', { brand, team: b.team, message: 'Full chaos mode activated — all services degraded' });
+      } else {
+        logger.info('chaos.cleared', { brand, team: b.team, message: 'Chaos mode cleared — services restored' });
+      }
+    }
+  }
+
   logger.info('feature_flag.toggled', {
     flag_name:  name,
     flag_value: newValue,
@@ -482,6 +534,77 @@ app.post('/api/flags/:name/toggle', (req, res) => {
   ]);
 
   res.json({ name, enabled: newValue, description: flag.description });
+});
+
+// ── Monitor status proxy (all monitors tagged to this service) ───────────────
+app.get('/api/monitors', async (req, res) => {
+  const apiKey = process.env.DD_API_KEY;
+  const appKey = process.env.DD_APP_KEY;
+  const site   = process.env.DD_SITE || 'datadoghq.com';
+
+  if (!apiKey || !appKey) {
+    return res.json({ monitors: [], total: 0, error: 'DD_APP_KEY not configured' });
+  }
+
+  try {
+    const qs = new URLSearchParams({
+      page_size:    '200',
+      monitor_tags: 'service:inspire-brands-platform',
+    });
+
+    const r = await fetch(`https://api.${site}/api/v1/monitor?${qs}`, {
+      headers: {
+        'DD-API-KEY':         apiKey,
+        'DD-APPLICATION-KEY': appKey,
+      },
+    });
+
+    if (!r.ok) {
+      return res.json({ monitors: [], total: 0, error: `Datadog API returned ${r.status}` });
+    }
+
+    const raw  = await r.json();
+    const list = Array.isArray(raw) ? raw : [];
+
+    const STATE_ORDER = { Alert: 0, Warn: 1, 'No Data': 2, Unknown: 3, OK: 4, Ignored: 5 };
+
+    const monitors = list
+      .filter(m => m.type !== 'synthetics alert')
+      .map(m => {
+        const brandTag = (m.tags || []).find(t => t.startsWith('brand:'));
+        const teamTag  = (m.tags || []).find(t => t.startsWith('team:'));
+        return {
+          id:       m.id,
+          name:     m.name,
+          state:    m.overall_state || 'Unknown',
+          priority: m.priority || 3,
+          type:     m.type,
+          brand:    brandTag ? brandTag.replace('brand:', '') : null,
+          team:     teamTag  ? teamTag.replace('team:', '')   : null,
+          url:      `https://app.${site}/monitors/${m.id}`,
+        };
+      })
+      .sort((a, b) => {
+        const sa = STATE_ORDER[a.state] ?? 3;
+        const sb = STATE_ORDER[b.state] ?? 3;
+        return sa !== sb ? sa - sb : (a.priority || 5) - (b.priority || 5);
+      });
+
+    const summary = { ok: 0, alert: 0, warn: 0, noData: 0, other: 0 };
+    monitors.forEach(m => {
+      if      (m.state === 'OK')      summary.ok++;
+      else if (m.state === 'Alert')   summary.alert++;
+      else if (m.state === 'Warn')    summary.warn++;
+      else if (m.state === 'No Data') summary.noData++;
+      else                             summary.other++;
+    });
+
+    logger.info('monitors.fetched', { total: monitors.length, ...summary });
+    res.json({ monitors, total: monitors.length, summary, timestamp: new Date().toISOString() });
+  } catch (e) {
+    logger.error('monitors.proxy_error', { error: e.message });
+    res.json({ monitors: [], total: 0, error: e.message });
+  }
 });
 
 // ── AI Assistant (LLM Observability demo) ────────────────
@@ -614,6 +737,29 @@ function mockResponse(message) {
   return `Great question about the ${CUSTOMER.company} platform! This demo spans **${brandCount} brands** (${brandList}) with full Datadog coverage: APM (${svcCount} services), ${monCount} monitors with P1–P3 triage runbooks, ${brandCount} brand SLOs, synthetics, structured logs, data pipeline observability, and cost attribution.\n\nTry asking about: brand status, Teams ownership, the tagging strategy, APM service map, monitors and SLOs, loyalty/delivery shared services, or triggering an outage scenario.`;
 }
 
+// ── LLM evaluation helpers ────────────────────────────────────────────────────
+function scoreResponse(message, response) {
+  const q = message.toLowerCase();
+  const r = response.toLowerCase();
+  const relevant   = BRAND_KEYS.some(k => r.includes(k)) || r.includes('datadog') || r.includes('platform');
+  const specific   = r.length > 200;
+  const hasNumbers = /\d+/.test(r);
+  return {
+    relevance:    relevant ? +(0.78 + Math.random() * 0.20).toFixed(2) : +(0.40 + Math.random() * 0.30).toFixed(2),
+    faithfulness: specific  ? +(0.80 + Math.random() * 0.18).toFixed(2) : +(0.55 + Math.random() * 0.25).toFixed(2),
+    quality:      hasNumbers ? +(3.8  + Math.random() * 1.2).toFixed(1)  : +(2.5  + Math.random() * 1.5).toFixed(1),
+  };
+}
+
+// Rotate between two model variants so Datadog shows an A/B experiment
+let _chatCallCount = 0;
+function pickModel() {
+  _chatCallCount++;
+  return _chatCallCount % 2 === 0
+    ? { modelName: CUSTOMER.servicePrefix + '-assistant-v2', modelProvider: CUSTOMER.servicePrefix + '-internal' }
+    : { modelName: CUSTOMER.servicePrefix + '-assistant-v1', modelProvider: CUSTOMER.servicePrefix + '-internal' };
+}
+
 app.post('/api/chat', async (req, res) => {
   const { message, brand, sessionId = `demo-${Date.now()}` } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'message required' });
@@ -635,8 +781,6 @@ app.post('/api/chat', async (req, res) => {
         sessionId, mlApp: CUSTOMER.mlApp,
       }, async (span) => {
         span.setTag('brand', brandTag);
-        span.setTag('session_id', sessionId);
-        span.setTag('mock', false);
 
         const response = await client.messages.create({
           model: 'claude-sonnet-4-6', max_tokens: 1024,
@@ -647,7 +791,7 @@ app.post('/api/chat', async (req, res) => {
         assistantMessage = response.content[0].text;
         usage            = response.usage;
 
-        LLMObs.annotate(span, {
+        LLMObs.annotate(null, {
           inputMessages:  [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
           outputMessages: [{ role: 'assistant', content: assistantMessage }],
           metadata: { brand: brandTag, sessionId, mock: false },
@@ -656,8 +800,9 @@ app.post('/api/chat', async (req, res) => {
       });
 
     } else {
-      // ── Smart mock path — still creates real LLMObs spans ──
-      await new Promise(r => setTimeout(r, 400 + Math.random() * 600)); // realistic latency
+      // ── Mock path — real LLMObs spans with full content ──
+      const latency = 350 + Math.random() * 700;
+      await new Promise(r => setTimeout(r, latency));
       assistantMessage = mockResponse(message);
       usage = {
         input_tokens:  Math.floor(systemPrompt.length / 4) + Math.floor(message.length / 4),
@@ -665,26 +810,39 @@ app.post('/api/chat', async (req, res) => {
       };
 
       if (LLMObs && typeof LLMObs.trace === 'function') {
+        const model  = pickModel();
+        const scores = scoreResponse(message, assistantMessage);
+
         await LLMObs.trace({
           kind: 'llm', name: 'platform_chat',
-          modelName: CUSTOMER.servicePrefix + '-assistant-v1', modelProvider: CUSTOMER.servicePrefix + '-internal',
+          modelName: model.modelName, modelProvider: model.modelProvider,
           sessionId, mlApp: CUSTOMER.mlApp,
         }, async (span) => {
           span.setTag('brand', brandTag);
-          span.setTag('session_id', sessionId);
-          span.setTag('mock', true);
+          span.setTag('model_variant', model.modelName);
+          span.setTag('latency_ms', Math.round(latency));
 
-          LLMObs.annotate(span, {
+          LLMObs.annotate(null, {
             inputMessages:  [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
             outputMessages: [{ role: 'assistant', content: assistantMessage }],
-            metadata: { brand: brandTag, sessionId, mock: true },
+            metadata: { brand: brandTag, sessionId, mock: true, model_variant: model.modelName },
             metrics: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens, totalTokens: usage.input_tokens + usage.output_tokens },
           });
+
+          // Submit evaluations inline while span is still active
+          if (typeof LLMObs.submitEvaluation === 'function') {
+            try {
+              const ts = Date.now();
+              LLMObs.submitEvaluation(span, { label: 'relevance',    metricType: 'score', value: scores.relevance,    timestampMs: ts });
+              LLMObs.submitEvaluation(span, { label: 'faithfulness', metricType: 'score', value: scores.faithfulness, timestampMs: ts });
+              LLMObs.submitEvaluation(span, { label: 'quality',      metricType: 'score', value: scores.quality,      timestampMs: ts });
+            } catch (_) {}
+          }
         });
       }
     }
 
-    dogstatsd.increment('llm.requests',      1,                   [`brand:${brandTag}`, `model:${CUSTOMER.servicePrefix}-assistant-v1`, `app:${CUSTOMER.mlApp}`]);
+    dogstatsd.increment('llm.requests',      1, [`brand:${brandTag}`, `app:${CUSTOMER.mlApp}`]);
     dogstatsd.histogram('llm.input_tokens',  usage.input_tokens,  [`brand:${brandTag}`]);
     dogstatsd.histogram('llm.output_tokens', usage.output_tokens, [`brand:${brandTag}`]);
 
@@ -699,6 +857,73 @@ app.post('/api/chat', async (req, res) => {
     logger.error('llm.chat_error', { error: e.message, brand: brandTag, sessionId });
     res.status(500).json({ error: 'Chat completion failed', details: e.message });
   }
+});
+
+// ── LLM dataset seeder ────────────────────────────────────────────────────────
+// POST /api/llm/seed — fires a rich set of brand-specific conversations to
+// populate LLM Observability with realistic traces, evaluations, and two model
+// variants (v1/v2) that can be compared in a Datadog Experiment.
+app.post('/api/llm/seed', async (req, res) => {
+  const conversations = [
+    // Arby's
+    { brand: 'arbys',   message: "What's the best sandwich at Arby's right now?" },
+    { brand: 'arbys',   message: "Is the Arby's drive-thru in Chicago still having POS issues?" },
+    { brand: 'arbys',   message: "What monitor fires when Arby's error rate spikes?" },
+    { brand: 'arbys',   message: "How do I escalate a Roast Beef supply chain alert to the ops team?" },
+    // Buffalo Wild Wings
+    { brand: 'bww',     message: "Which BWW locations are showing slow POS response times?" },
+    { brand: 'bww',     message: "How does the Wing Tuesday promotion affect order volume metrics?" },
+    { brand: 'bww',     message: "Explain the BWW delivery SLO and what triggers a breach." },
+    { brand: 'bww',     message: "What's the p95 latency threshold for Buffalo Wild Wings POS?" },
+    // Sonic
+    { brand: 'sonic',   message: "Why is Sonic Drive-In showing anomalous order volume?" },
+    { brand: 'sonic',   message: "How does the carhop channel differ from drive-thru in the APM service map?" },
+    { brand: 'sonic',   message: "What's the current Sonic loyalty program lookup failure rate?" },
+    { brand: 'sonic',   message: "Explain Sonic's happy hour impact on real-time metrics." },
+    // Dunkin'
+    { brand: 'dunkin',  message: "How does mobile-order volume compare to drive-thru at Dunkin'?" },
+    { brand: 'dunkin',  message: "What team owns the Dunkin' loyalty service?" },
+    { brand: 'dunkin',  message: "Is there a monitor for Dunkin' cold brew inventory lag?" },
+    { brand: 'dunkin',  message: "How are Dunkin' morning rush metrics tracked in Datadog?" },
+    // Baskin-Robbins
+    { brand: 'baskin-robbins', message: "What's the catering order SLO for Baskin-Robbins?" },
+    { brand: 'baskin-robbins', message: "How does the Baskin-Robbins ice cream cake delivery route work?" },
+    { brand: 'baskin-robbins', message: "Which APM service handles Baskin-Robbins online orders?" },
+    // Jimmy John's
+    { brand: 'jimmy-johns', message: "How does 'Freaky Fast' delivery get measured in Datadog?" },
+    { brand: 'jimmy-johns', message: "What happens when Jimmy John's delivery ETA exceeds 15 minutes?" },
+    { brand: 'jimmy-johns', message: "Show me the catering service dependency map for Jimmy John's." },
+    // Cross-brand / platform
+    { brand: 'platform', message: "Which brand had the most orders in the last hour?" },
+    { brand: 'platform', message: "Show me a summary of all active incidents right now." },
+    { brand: 'platform', message: "How does the loyalty shared service affect all 6 brands?" },
+    { brand: 'platform', message: "Walk me through the full alert → triage → resolve workflow." },
+    { brand: 'platform', message: "What is Unified Service Tagging and why does it matter here?" },
+    { brand: 'platform', message: "How does LLM Observability work in this demo?" },
+    { brand: 'platform', message: "Explain cost attribution across Inspire Brands in Datadog." },
+    { brand: 'platform', message: "What's the difference between a P1 and P3 monitor in this setup?" },
+  ];
+
+  const results = [];
+  for (const conv of conversations) {
+    try {
+      const resp = await fetch(`http://localhost:${process.env.PORT || 3000}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...conv, sessionId: `seed-${Date.now()}-${Math.random().toString(36).slice(2,7)}` }),
+      });
+      const data = await resp.json();
+      results.push({ brand: conv.brand, ok: true, tokens: data.usage?.input_tokens + data.usage?.output_tokens });
+      await new Promise(r => setTimeout(r, 120));
+    } catch (e) {
+      results.push({ brand: conv.brand, ok: false, error: e.message });
+    }
+  }
+
+  const ok    = results.filter(r => r.ok).length;
+  const total = results.length;
+  logger.info('llm.seed_complete', { ok, total });
+  res.json({ seeded: ok, total, results });
 });
 
 // ── Security demo endpoints (ASM) ────────────────────────
@@ -752,7 +977,24 @@ app.get('/inspire', (req, res) => {
 app.get('/brands/:brand', (req, res) => {
   const { brand } = req.params;
   if (!BRANDS[brand]) return res.status(404).send('Brand not found');
+  if (FLAGS[`${brand}-chaos`]?.enabled) {
+    const name = BRANDS[brand].name;
+    return res.status(503).send(`<!DOCTYPE html><html><head><title>${name} — Service Unavailable</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0d0000;color:#fff;text-align:center}div{padding:40px}.code{font-size:5rem;font-weight:900;color:#ef4444;line-height:1}.title{font-size:1.4rem;font-weight:700;margin:16px 0 8px;color:#fca5a5}.sub{font-size:.95rem;color:#9ca3af}</style></head><body><div><div class="code">☢ 503</div><div class="title">${name} — Critical Incident</div><div class="sub">All services unavailable. Chaos mode is active.</div></div></body></html>`);
+  }
   res.sendFile(path.join(__dirname, 'public', 'brands', 'app.html'));
+});
+
+// ── Traffic rate control ──────────────────────────────────
+app.get('/api/traffic-rate', (req, res) => {
+  res.json({ rate: trafficRate, config: TRAFFIC_RATES[trafficRate] });
+});
+
+app.post('/api/traffic-rate/:rate', (req, res) => {
+  const { rate } = req.params;
+  if (!TRAFFIC_RATES[rate]) return res.status(400).json({ error: `Unknown rate: ${rate}. Use off|low|medium|high` });
+  trafficRate = rate;
+  logger.info('traffic.rate_changed', { rate, config: TRAFFIC_RATES[rate] });
+  res.json({ rate, config: TRAFFIC_RATES[rate] });
 });
 
 // Catch-all → SPA
@@ -817,6 +1059,91 @@ setInterval(() => {
   dogstatsd.gauge('data.platform_queue_total', platformQueueTotal);
 }, 15000);
 
+// ── Background traffic generator ─────────────────────────
+// Fires realistic orders, loyalty lookups, and delivery estimates
+// across all brands continuously to keep metrics and APM flowing.
+let trafficRate = 'medium'; // 'low' | 'medium' | 'high' | 'off'
+
+const TRAFFIC_RATES = {
+  off:    { ordersPerBrand: 0, intervalMs: 5000 },
+  low:    { ordersPerBrand: 1, intervalMs: 8000  },  // ~7/brand/min
+  medium: { ordersPerBrand: 3, intervalMs: 5000  },  // ~36/brand/min
+  high:   { ordersPerBrand: 8, intervalMs: 3000  },  // ~160/brand/min
+};
+
+async function fireBackgroundOrder(brand) {
+  const b = BRANDS[brand];
+  if (!b) return;
+
+  // Resolve flags inline — don't go through HTTP to avoid extra APM noise on internal calls
+  const outage = FLAGS[`${brand}-pos-outage`]?.enabled;
+  const slow   = FLAGS[`${brand}-slow-pos`]?.enabled;
+
+  if (outage) {
+    brandMetrics[brand].errors++;
+    dogstatsd.increment('pos.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'error_type:outage', 'source:background']);
+    return;
+  }
+
+  const channel  = b.channels[Math.floor(Math.random() * b.channels.length)];
+  const item     = b.menu[Math.floor(Math.random() * b.menu.length)];
+  const quantity = Math.random() < 0.2 ? 2 : 1;
+  const baseMs   = Math.floor(Math.random() * 300) + 50;
+  const delayMs  = slow ? baseMs * 3 : baseMs;
+
+  await new Promise(r => setTimeout(r, delayMs));
+
+  const order = {
+    id:           uuidv4(),
+    brand,
+    item:         item.name,
+    quantity,
+    total:        +(item.price * quantity).toFixed(2),
+    channel,
+    status:       'confirmed',
+    processingMs: delayMs,
+  };
+
+  brandOrders[brand].push(order);
+  brandMetrics[brand].totalOrders++;
+  brandMetrics[brand].totalRevenue += order.total;
+
+  dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`, 'source:background']);
+  dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`]);
+  dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`]);
+  dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slow}`]);
+
+  // Occasional loyalty lookup alongside the order (~40% of orders)
+  if (Math.random() < 0.4) {
+    const degraded = FLAGS['loyalty-degraded']?.enabled;
+    const chaos    = FLAGS[`${brand}-chaos`]?.enabled;
+    if (!chaos) {
+      brandMetrics[brand].loyaltyLookups++;
+      if (degraded && Math.random() < 0.4) {
+        dogstatsd.increment('loyalty.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'source:background']);
+      } else {
+        const points = Math.floor(Math.random() * 5000) + 100;
+        dogstatsd.histogram('loyalty.lookup_latency', degraded ? Math.random() * 2000 + 400 : Math.random() * 200 + 20, [`brand:${brand}`, `team:${b.team}`]);
+        dogstatsd.gauge('loyalty.member_points', points, [`brand:${brand}`, `team:${b.team}`]);
+      }
+    }
+  }
+}
+
+function scheduleBackgroundTraffic() {
+  const { ordersPerBrand, intervalMs } = TRAFFIC_RATES[trafficRate];
+  if (ordersPerBrand === 0) return setTimeout(scheduleBackgroundTraffic, 2000);
+
+  const fires = [];
+  for (const brand of BRAND_KEYS) {
+    const count = ordersPerBrand + Math.floor(Math.random() * 2); // slight jitter
+    for (let i = 0; i < count; i++) {
+      fires.push(fireBackgroundOrder(brand));
+    }
+  }
+  Promise.allSettled(fires).then(() => setTimeout(scheduleBackgroundTraffic, intervalMs));
+}
+
 app.listen(PORT, () => {
   logger.info(`${CUSTOMER.platform} started`, {
     port:   PORT,
@@ -825,4 +1152,6 @@ app.listen(PORT, () => {
     teams:  [...new Set(BRAND_KEYS.map(b => BRANDS[b].team))],
   });
   dogstatsd.increment('platform.started');
+  // Start background traffic after a short warm-up delay
+  setTimeout(scheduleBackgroundTraffic, 3000);
 });

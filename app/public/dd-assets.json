@@ -65,14 +65,68 @@
       "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Ajimmy-johns"
     }
   },
-  "slos": {
-    "arbys": "c04d4151a2275a97a5958356862f8367",
-    "bww": "315e7bdced425832ba83b7d8f6695da1",
-    "sonic": "6728ee288283515ba760768d034d0ad9",
-    "dunkin": "1dc95501fcd45205a630bc15c0d48c29",
-    "baskin-robbins": "a22000b1ca6553e7bc4674b92520bd18",
-    "jimmy-johns": "0ef819d2cdc557b298fd1e41d0533e7e"
-  },
+  "slos": [
+    {
+      "brand": "arbys",
+      "type": "availability"
+    },
+    {
+      "brand": "arbys",
+      "type": "latency"
+    },
+    {
+      "brand": "bww",
+      "type": "availability"
+    },
+    {
+      "brand": "bww",
+      "type": "latency"
+    },
+    {
+      "brand": "sonic",
+      "type": "availability"
+    },
+    {
+      "brand": "sonic",
+      "type": "latency"
+    },
+    {
+      "brand": "dunkin",
+      "type": "availability"
+    },
+    {
+      "brand": "dunkin",
+      "type": "latency"
+    },
+    {
+      "brand": "baskin-robbins",
+      "type": "availability"
+    },
+    {
+      "brand": "baskin-robbins",
+      "type": "latency"
+    },
+    {
+      "brand": "jimmy-johns",
+      "type": "availability"
+    },
+    {
+      "brand": "jimmy-johns",
+      "type": "latency"
+    },
+    {
+      "brand": "platform",
+      "type": "availability"
+    },
+    {
+      "brand": "platform",
+      "type": "loyalty"
+    },
+    {
+      "brand": "platform",
+      "type": "delivery"
+    }
+  ],
   "rum": {
     "arbys": {
       "applicationId": "d7a111b2-f826-48d8-92bb-33fcce3285ae",
