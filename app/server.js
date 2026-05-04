@@ -871,8 +871,8 @@ app.post('/api/chat', async (req, res) => {
         usage            = response.usage;
 
         LLMObs.annotate(null, {
-          inputMessages:  [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
-          outputMessages: [{ role: 'assistant', content: assistantMessage }],
+          inputData:  [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
+          outputData: [{ role: 'assistant', content: assistantMessage }],
           metadata: { brand: brandTag, sessionId, mock: false },
           metrics: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens, totalTokens: usage.input_tokens + usage.output_tokens },
         });
@@ -902,8 +902,8 @@ app.post('/api/chat', async (req, res) => {
           span.setTag('latency_ms', Math.round(latency));
 
           LLMObs.annotate(null, {
-            inputMessages:  [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
-            outputMessages: [{ role: 'assistant', content: assistantMessage }],
+            inputData:  [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }],
+            outputData: [{ role: 'assistant', content: assistantMessage }],
             metadata: { brand: brandTag, sessionId, mock: true, model_variant: model.modelName },
             metrics: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens, totalTokens: usage.input_tokens + usage.output_tokens },
           });
