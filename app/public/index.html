@@ -1181,12 +1181,10 @@
   function renderSuggestions() {
     const msgs = document.getElementById('chatMessages');
     msgs.innerHTML = `
-      <div class="chat-msg system"><div class="bubble">Powered by Claude + Datadog LLM Observability. Every message is traced in real time.</div></div>`;
-    const sug = document.createElement('div');
-    sug.className = 'chat-suggestions';
-    sug.id = 'chatSuggestions';
-    sug.innerHTML = SUGGESTIONS.map(s => `<button class="chat-sug" onclick="sendChat(${JSON.stringify(s)})">${s}</button>`).join('');
-    msgs.after(sug);
+      <div class="chat-msg system"><div class="bubble">Powered by Claude + Datadog LLM Observability. Every message is traced in real time.</div></div>
+      <div class="chat-suggestions" id="chatSuggestions">
+        ${SUGGESTIONS.map(s => `<button class="chat-sug" onclick="sendChat(${JSON.stringify(s)})">${s}</button>`).join('')}
+      </div>`;
   }
 
   function appendMsg(role, text) {
