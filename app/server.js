@@ -23,6 +23,24 @@ const { v4: uuidv4 } = require('uuid');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 let   Anthropic     = null;
 
+// ── PostgreSQL persistence (DBM-instrumented) ─────────────
+const { Pool } = require('pg');
+const db = new Pool({
+  host:     process.env.PGHOST     || 'localhost',
+  port:     parseInt(process.env.PGPORT || '5432'),
+  database: process.env.PGDATABASE || 'inspire_brands',
+  user:     process.env.PGUSER     || 'inspire',
+  password: process.env.PGPASSWORD || 'inspire_pw',
+  max: 5,
+});
+let dbReady = false;
+
+async function dbQuery(sql, params = []) {
+  if (!dbReady) return null;
+  try { return await db.query(sql, params); }
+  catch (e) { console.warn('db query error:', e.message); return null; }
+}
+
 // Enable LLMObs — guard in case dd-trace version doesn't export it
 if (LLMObs && typeof LLMObs.enable === 'function') {
   LLMObs.enable({
@@ -130,6 +148,61 @@ FLAGS['delivery-surge'] = {
   impact:      'latency',
   brand:       null,
 };
+
+// ── Restore persisted state from DB ──────────────────────
+async function restoreState() {
+  // Restore feature flags
+  const flags = await dbQuery('SELECT key, enabled FROM feature_flags');
+  if (flags) {
+    for (const row of flags.rows) {
+      if (FLAGS[row.key]) FLAGS[row.key].enabled = row.enabled;
+    }
+    console.log(`✓ Restored ${flags.rows.length} feature flags from DB`);
+  }
+
+  // Restore brand metrics (sum today's rows)
+  const metrics = await dbQuery(`
+    SELECT brand,
+           SUM(orders)   AS orders,
+           SUM(revenue)  AS revenue,
+           SUM(errors)   AS errors
+    FROM brand_metrics
+    WHERE ts > NOW() - INTERVAL '24 hours'
+    GROUP BY brand
+  `);
+  if (metrics) {
+    for (const row of metrics.rows) {
+      if (brandMetrics[row.brand]) {
+        brandMetrics[row.brand].totalOrders  += parseInt(row.orders  || 0);
+        brandMetrics[row.brand].totalRevenue += parseFloat(row.revenue || 0);
+        brandMetrics[row.brand].errors       += parseInt(row.errors  || 0);
+      }
+    }
+    console.log(`✓ Restored brand metrics for ${metrics.rows.length} brands from DB`);
+  }
+}
+
+// ── Periodic metric flush (write deltas to DB every 30s) ──
+const _lastFlushed = Object.fromEntries(BRAND_KEYS.map(b => [b, { totalOrders: 0, totalRevenue: 0, errors: 0 }]));
+
+async function flushMetricsToDB() {
+  for (const brand of BRAND_KEYS) {
+    const m = brandMetrics[brand];
+    const l = _lastFlushed[brand];
+    const dOrders  = m.totalOrders  - l.totalOrders;
+    const dRevenue = m.totalRevenue - l.totalRevenue;
+    const dErrors  = m.errors       - l.errors;
+    if (dOrders > 0 || dRevenue > 0 || dErrors > 0) {
+      await dbQuery(
+        'INSERT INTO brand_metrics (brand, orders, revenue, errors) VALUES ($1, $2, $3, $4)',
+        [brand, dOrders, +(dRevenue.toFixed(2)), dErrors]
+      );
+      l.totalOrders  = m.totalOrders;
+      l.totalRevenue = m.totalRevenue;
+      l.errors       = m.errors;
+    }
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────
 function tagBrand(brand) {
@@ -498,6 +571,12 @@ app.post('/api/flags/:name/toggle', (req, res) => {
   const newValue = FLAGS[name].enabled;
   const flag     = FLAGS[name];
 
+  // Persist flag state to DB
+  dbQuery(
+    'INSERT INTO feature_flags (key, enabled, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET enabled=$2, updated_at=NOW()',
+    [name, newValue]
+  );
+
   // Chaos cascade: flip pos-outage + slow-pos together, and burst metrics to fire monitors immediately
   if (name.endsWith('-chaos')) {
     const brand = name.replace('-chaos', '');
@@ -851,6 +930,17 @@ app.post('/api/chat', async (req, res) => {
       input_tokens: usage.input_tokens, output_tokens: usage.output_tokens,
     });
 
+    // Persist chat session turns to DB
+    const modelName = (ANTHROPIC_KEY && Anthropic) ? 'claude-sonnet-4-6' : undefined;
+    dbQuery(
+      'INSERT INTO chat_sessions (session_id, brand, role, content, tokens) VALUES ($1, $2, $3, $4, $5)',
+      [sessionId, brandTag, 'user', message.slice(0, 4000), usage.input_tokens]
+    );
+    dbQuery(
+      'INSERT INTO chat_sessions (session_id, brand, role, content, tokens, model) VALUES ($1, $2, $3, $4, $5, $6)',
+      [sessionId, brandTag, 'assistant', assistantMessage.slice(0, 4000), usage.output_tokens, modelName || null]
+    );
+
     res.json({ message: assistantMessage, usage, sessionId });
 
   } catch (e) {
@@ -1144,14 +1234,28 @@ function scheduleBackgroundTraffic() {
   Promise.allSettled(fires).then(() => setTimeout(scheduleBackgroundTraffic, intervalMs));
 }
 
-app.listen(PORT, () => {
-  logger.info(`${CUSTOMER.platform} started`, {
-    port:   PORT,
-    env:    process.env.DD_ENV || 'local',
-    brands: BRAND_KEYS.length,
-    teams:  [...new Set(BRAND_KEYS.map(b => BRANDS[b].team))],
+async function startup() {
+  try {
+    const client = await db.connect();
+    client.release();
+    dbReady = true;
+    console.log('✓ PostgreSQL connected (DBM enabled)');
+    await restoreState();
+    setInterval(flushMetricsToDB, 30000);
+  } catch (e) {
+    console.warn('⚠  PostgreSQL unavailable — running in-memory only:', e.message);
+  }
+
+  app.listen(PORT, () => {
+    logger.info(`${CUSTOMER.platform} started`, {
+      port:   PORT,
+      env:    process.env.DD_ENV || 'local',
+      brands: BRAND_KEYS.length,
+      teams:  [...new Set(BRAND_KEYS.map(b => BRANDS[b].team))],
+      db:     dbReady ? 'postgres' : 'in-memory',
+    });
+    dogstatsd.increment('platform.started');
+    setTimeout(scheduleBackgroundTraffic, 3000);
   });
-  dogstatsd.increment('platform.started');
-  // Start background traffic after a short warm-up delay
-  setTimeout(scheduleBackgroundTraffic, 3000);
-});
+}
+startup();
