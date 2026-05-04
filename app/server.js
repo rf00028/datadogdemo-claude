@@ -582,6 +582,9 @@ app.post('/api/flags/:name/toggle', (req, res) => {
     const brand = name.replace('-chaos', '');
     if (FLAGS[`${brand}-pos-outage`]) FLAGS[`${brand}-pos-outage`].enabled = newValue;
     if (FLAGS[`${brand}-slow-pos`])   FLAGS[`${brand}-slow-pos`].enabled   = newValue;
+    // Persist cascaded flags so they survive restarts
+    dbQuery('INSERT INTO feature_flags (key,enabled,updated_at) VALUES ($1,$2,NOW()) ON CONFLICT (key) DO UPDATE SET enabled=$2,updated_at=NOW()', [`${brand}-pos-outage`, newValue]);
+    dbQuery('INSERT INTO feature_flags (key,enabled,updated_at) VALUES ($1,$2,NOW()) ON CONFLICT (key) DO UPDATE SET enabled=$2,updated_at=NOW()', [`${brand}-slow-pos`, newValue]);
     if (BRANDS[brand]) {
       const b = BRANDS[brand];
       if (newValue) {
