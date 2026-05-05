@@ -32,37 +32,43 @@
       "dashboard": "https://app.datadoghq.com/dashboard/f75-z6m-tar",
       "apm": "https://app.datadoghq.com/apm/services/inspire-arbys-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Aarbys-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Aarbys"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Aarbys",
+      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3Ad7a111b2-f826-48d8-92bb-33fcce3285ae"
     },
     "bww": {
       "dashboard": "https://app.datadoghq.com/dashboard/q5d-bjs-bse",
       "apm": "https://app.datadoghq.com/apm/services/inspire-bww-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Abww-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Abww"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Abww",
+      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A66aabdd7-0f55-4661-86bc-8c2d9dae596b"
     },
     "sonic": {
       "dashboard": "https://app.datadoghq.com/dashboard/nxt-4cb-fca",
       "apm": "https://app.datadoghq.com/apm/services/inspire-sonic-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Asonic-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Asonic"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Asonic",
+      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A4b20f6fe-a3a3-4589-a687-740922ed05bd"
     },
     "dunkin": {
       "dashboard": "https://app.datadoghq.com/dashboard/yd2-vab-79j",
       "apm": "https://app.datadoghq.com/apm/services/inspire-dunkin-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Adunkin-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Adunkin"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Adunkin",
+      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A4ed78b23-f9db-4187-837d-57202dd79590"
     },
     "baskin-robbins": {
       "dashboard": "https://app.datadoghq.com/dashboard/mu7-y5j-aw3",
       "apm": "https://app.datadoghq.com/apm/services/inspire-baskin-robbins-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Abr-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Abaskin-robbins"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Abaskin-robbins",
+      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A671bd65c-031c-49fd-82fd-658a7259dc29"
     },
     "jimmy-johns": {
       "dashboard": "https://app.datadoghq.com/dashboard/tap-3s5-x26",
       "apm": "https://app.datadoghq.com/apm/services/inspire-jimmy-johns-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Ajj-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Ajimmy-johns"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Ajimmy-johns",
+      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3Aea27a8c2-c632-43dc-9e51-ec2faef0caa8"
     }
   },
   "slos": [

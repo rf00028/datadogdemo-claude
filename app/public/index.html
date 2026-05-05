@@ -917,6 +917,7 @@
             <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.apm || 'https://app.datadoghq.com/apm/services?env=local&search=inspire-' + b.key}" target="_blank">⬡ APM</a>
             <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.monitors || 'https://app.datadoghq.com/monitors/manage?q=team%3A' + b.team}" target="_blank">🔔 Monitors</a>
             <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.logs || 'https://app.datadoghq.com/logs?query=brand%3A' + b.key}" target="_blank">📝 Logs</a>
+            <a class="bdd-link" href="${ddAssets?.brandLinks?.[b.key]?.rum || 'https://app.datadoghq.com/rum/sessions?query=service%3Ainspire-' + b.key + '-web'}" target="_blank">👁 RUM</a>
           </div>
         </div>
       </div>`;
