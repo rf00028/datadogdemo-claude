@@ -1097,6 +1097,49 @@ app.post('/api/deploy', async (req, res) => {
   res.json({ ok: true, version, burstDurationMs: 60000 });
 });
 
+// ── DBM stats ────────────────────────────────────────────
+app.get('/api/dbm/stats', async (req, res) => {
+  if (!dbReady) return res.json({ ready: false });
+  try {
+    const [activity, tbl, slowLog] = await Promise.all([
+      dbQuery(`SELECT
+        count(*) AS connections,
+        count(*) FILTER (WHERE state='active') AS active,
+        count(*) FILTER (WHERE state='active' AND now()-query_start > interval '1 second') AS slow,
+        max(EXTRACT(epoch FROM (now()-query_start)) * 1000) FILTER (WHERE state='active') AS max_ms
+        FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()`),
+      dbQuery(`SELECT count(*) AS total_rows, count(DISTINCT brand) AS brands,
+               max(ts) AS last_ts FROM brand_metrics`),
+      dbQuery(`SELECT query, calls, mean_exec_time, max_exec_time, rows
+               FROM pg_stat_statements
+               WHERE dbid = (SELECT oid FROM pg_database WHERE datname=current_database())
+               ORDER BY mean_exec_time DESC LIMIT 5`),
+    ]);
+    const a = activity?.rows?.[0] || {};
+    const t = tbl?.rows?.[0]      || {};
+    const slowQueries = (slowLog?.rows || []).map(r => ({
+      query:    r.query.slice(0, 80),
+      calls:    parseInt(r.calls),
+      meanMs:   parseFloat(r.mean_exec_time).toFixed(1),
+      maxMs:    parseFloat(r.max_exec_time).toFixed(1),
+    }));
+    res.json({
+      ready:        true,
+      connections:  parseInt(a.connections) || 0,
+      activeQueries:parseInt(a.active)      || 0,
+      slowNow:      parseInt(a.slow)        || 0,
+      maxLatencyMs: parseFloat(a.max_ms)    || 0,
+      totalRows:    parseInt(t.total_rows)  || 0,
+      brands:       parseInt(t.brands)      || 0,
+      lastWrite:    t.last_ts               || null,
+      topSlowQueries: slowQueries,
+      dbmUrl: `https://app.datadoghq.com/databases/queries?host=localhost&dbname=${process.env.PGDATABASE || 'inspire_brands'}`,
+    });
+  } catch (e) {
+    res.json({ ready: true, error: e.message, connections: 0, activeQueries: 0, slowNow: 0 });
+  }
+});
+
 // ── SLO status (KPI source) ───────────────────────────────
 app.get('/api/datadog/slos', async (req, res) => {
   const apiKey = process.env.DD_API_KEY;

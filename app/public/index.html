@@ -747,6 +747,35 @@
 
   </div>
 
+  <!-- ── Database Monitoring ── -->
+  <div class="section-header" style="margin-top:36px;"><h2>Database Monitoring (DBM)</h2></div>
+  <div class="tools-row" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));">
+
+    <div class="tool-card" style="border-color:#a855f733;">
+      <h3>🗄 PostgreSQL Live Stats</h3>
+      <p>Real-time connection pool and query activity from the local <code style="color:#c084fc;">inspire_brands</code> database — instrumented via dd-trace DBM.</p>
+      <div id="dbmStats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div class="bm" style="background:var(--surface);"><div class="bm-label">Connections</div><div class="bm-value" id="dbmConn">—</div></div>
+        <div class="bm" style="background:var(--surface);"><div class="bm-label">Active Queries</div><div class="bm-value" id="dbmActive">—</div></div>
+        <div class="bm" style="background:var(--surface);"><div class="bm-label">Slow Now (&gt;1s)</div><div class="bm-value" id="dbmSlow">—</div></div>
+        <div class="bm" style="background:var(--surface);"><div class="bm-label">Total Rows</div><div class="bm-value" id="dbmRows">—</div></div>
+      </div>
+      <a id="dbmDdLink" href="https://app.datadoghq.com/databases/queries" target="_blank" class="bdd-link" style="font-size:0.72rem;padding:5px 12px;">↗ Open in Datadog DBM</a>
+      <div id="dbmNote" style="font-size:0.68rem;color:var(--subtle);margin-top:8px;min-height:14px;"></div>
+    </div>
+
+    <div class="tool-card" style="border-color:#a855f733;">
+      <h3>🐢 Top Slow Queries</h3>
+      <p>Highest mean execution time from <code style="color:#c084fc;">pg_stat_statements</code>. Chaos mode injects <code style="color:#c084fc;">pg_sleep(1.5)</code> to simulate slow DB queries visible in Datadog DBM.</p>
+      <div id="dbmSlowTable" style="font-size:0.68rem;color:var(--subtle);line-height:1.8;">Loading…</div>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn-purple" onclick="loadDbmStats()" style="font-size:0.72rem;padding:5px 12px;">Refresh</button>
+        <a href="https://app.datadoghq.com/databases/queries" target="_blank" class="bdd-link" style="font-size:0.72rem;padding:5px 12px;">↗ DD DBM Queries</a>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ── Console ── -->
   <div class="console-wrap">
     <div class="console-header">
@@ -1138,6 +1167,45 @@
     } catch(_) {}
   }
 
+  // ── DBM stats ────────────────────────────────────────────
+  async function loadDbmStats() {
+    try {
+      const res = await fetch('/api/dbm/stats');
+      if (!res.ok) return;
+      const d = await res.json();
+      if (!d.ready) {
+        document.getElementById('dbmSlowTable').textContent = 'PostgreSQL not connected';
+        return;
+      }
+      document.getElementById('dbmConn').textContent   = d.connections;
+      const activeEl = document.getElementById('dbmActive');
+      activeEl.textContent = d.activeQueries;
+      activeEl.style.color = d.activeQueries > 0 ? 'var(--yellow)' : '';
+      const slowEl = document.getElementById('dbmSlow');
+      slowEl.textContent = d.slowNow;
+      slowEl.style.color = d.slowNow > 0 ? 'var(--red)' : 'var(--green)';
+      document.getElementById('dbmRows').textContent  = (d.totalRows || 0).toLocaleString();
+      if (d.dbmUrl) document.getElementById('dbmDdLink').href = d.dbmUrl;
+      const note = document.getElementById('dbmNote');
+      note.textContent = d.slowNow > 0
+        ? `⚠ ${d.slowNow} slow query active — visible in Datadog DBM`
+        : d.maxLatencyMs > 100 ? `Max query latency: ${d.maxLatencyMs.toFixed(0)}ms` : '';
+      note.style.color = d.slowNow > 0 ? 'var(--red)' : 'var(--subtle)';
+
+      const tbl = document.getElementById('dbmSlowTable');
+      if (!d.topSlowQueries?.length) {
+        tbl.textContent = 'No pg_stat_statements data yet — run some queries first';
+        return;
+      }
+      tbl.innerHTML = d.topSlowQueries.map(q => `
+        <div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--border);">
+          <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);" title="${q.query}">${q.query}</div>
+          <div style="flex-shrink:0;color:${parseFloat(q.meanMs)>500?'var(--red)':parseFloat(q.meanMs)>100?'var(--yellow)':'var(--green)'};">${q.meanMs}ms</div>
+          <div style="flex-shrink:0;color:var(--muted);">${q.calls}×</div>
+        </div>`).join('');
+    } catch(_) {}
+  }
+
   // ── Log flood ────────────────────────────────────────────
   async function floodLogs() {
     const count  = parseInt(document.getElementById('floodCount').value);
@@ -1490,11 +1558,13 @@
     loadTrafficRate();
     loadDDStats();
     loadSloStatus();
+    loadDbmStats();
     api('GET', '/health', null, null);
     setInterval(() => { loadBrands(); loadFlags(); }, 3000);
     setInterval(loadAlerts, 15000);
     setInterval(loadDDStats, 30000);
     setInterval(loadSloStatus, 30000);
+    setInterval(loadDbmStats, 10000);
   }
 
   init();
