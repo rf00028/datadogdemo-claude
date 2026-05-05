@@ -8,6 +8,7 @@ const tracer = require('dd-trace').init({
   logInjection: true,
   runtimeMetrics: true,
   profiling: true,
+  appsec: process.env.DD_APPSEC_ENABLED !== 'false',
 });
 
 const ddTrace = require('dd-trace');
@@ -1029,27 +1030,35 @@ app.post('/api/llm/seed', async (req, res) => {
 // ── Security demo endpoints (ASM) ────────────────────────
 // These endpoints intentionally accept user-controlled input so ASM can detect
 // and block common attack patterns (SQLi, XSS, path traversal) in demo scenarios.
-app.get('/api/security/scan', (req, res) => {
+app.get('/api/security/scan', async (req, res) => {
   const { q = '', user_id = '' } = req.query;
   const span = tracer.scope().active();
   if (span) {
     span.setTag('security.demo', true);
-    span.setTag('query_param', q.slice(0, 100));
+    span.setTag('usr.id', user_id || 'anonymous');
+    span.setTag('http.parameters', JSON.stringify(req.query).slice(0, 200));
   }
-  logger.info('security.scan_request', { query: q, user_id, ip: req.ip });
+  logger.warn('security.scan_request', { query: q, user_id, ip: req.ip, suspicious: q.includes("'") || q.includes('<') });
   dogstatsd.increment('security.scan_requests', 1, ['endpoint:search']);
-  res.json({ results: [], query: q, user_id, timestamp: new Date().toISOString() });
+  // Use query in a parameterized DB lookup so APM traces show the DB call
+  const rows = await dbQuery('SELECT brand, count(*) FROM brand_metrics WHERE brand ILIKE $1 GROUP BY brand LIMIT 5', [`%${q.replace(/['";<>]/g, '')}%`]);
+  res.json({ results: rows?.rows || [], query: q, user_id, timestamp: new Date().toISOString() });
 });
 
-app.post('/api/security/login', (req, res) => {
+app.post('/api/security/login', async (req, res) => {
   const { username = '', password = '' } = req.body;
   const span = tracer.scope().active();
-  if (span) span.setTag('security.demo', true);
-  logger.info('security.login_attempt', { username, ip: req.ip });
+  if (span) {
+    span.setTag('security.demo', true);
+    span.setTag('usr.name', username.slice(0, 50));
+    span.setTag('http.request.body', JSON.stringify({ username, password: '[REDACTED]' }));
+  }
+  logger.warn('security.login_attempt', { username, ip: req.ip, suspicious: username.includes("'") || username.includes('OR') });
   dogstatsd.increment('security.login_attempts', 1);
-  // Simulate auth — always returns success for demo
+  // Parameterized lookup — WAF fires on the raw request before this runs
+  const user = await dbQuery('SELECT brand FROM brand_metrics WHERE brand = $1 LIMIT 1', [username.replace(/['";<>]/g, '').slice(0, 50)]);
   const token = Buffer.from(`${username}:${Date.now()}`).toString('base64');
-  res.json({ token, username, authenticated: true });
+  res.json({ token, username, authenticated: !!(user?.rows?.length), timestamp: new Date().toISOString() });
 });
 
 app.get('/api/security/file', (req, res) => {
@@ -1057,11 +1066,15 @@ app.get('/api/security/file', (req, res) => {
   const span = tracer.scope().active();
   if (span) {
     span.setTag('security.demo', true);
-    span.setTag('requested_path', filePath.slice(0, 200));
+    span.setTag('file.path', filePath.slice(0, 200));
+    span.setTag('http.parameters', JSON.stringify(req.query).slice(0, 200));
   }
-  logger.info('security.file_request', { path: filePath, ip: req.ip });
+  logger.warn('security.file_request', { path: filePath, ip: req.ip, suspicious: filePath.includes('..') || filePath.includes('/etc/') });
   dogstatsd.increment('security.file_requests', 1, ['endpoint:file']);
-  res.json({ file: filePath, content: 'demo content', timestamp: new Date().toISOString() });
+  // Resolve path but serve only from safe content map — WAF fires on traversal pattern in request
+  const SAFE = { 'menu.json': 'menu', 'config.json': 'config', 'health.json': 'health' };
+  const content = SAFE[filePath] ? `demo:${SAFE[filePath]}` : 'access denied';
+  res.json({ file: filePath, content, timestamp: new Date().toISOString() });
 });
 
 // ── Deployment event + 60s burst ─────────────────────────
