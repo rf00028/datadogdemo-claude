@@ -100,6 +100,29 @@
     .kpi-value.red   { color: var(--red);   }
     .kpi-value.yellow{ color: var(--yellow);}
 
+    /* ── Health score bar ── */
+    .health-score { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px; }
+    .health-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .health-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
+    .health-num { font-size: 0.7rem; font-weight: 800; min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Hotkeys overlay ── */
+    .hotkeys-help {
+      position: fixed; bottom: 72px; right: 24px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+      font-size: 0.75rem; color: var(--text);
+      display: none; z-index: 500;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      min-width: 220px;
+    }
+    .hotkeys-help.visible { display: block; }
+    .hotkeys-title { font-weight: 800; margin-bottom: 12px; color: var(--dd); font-size: 0.8rem; }
+    .hotkeys-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center; }
+    .hotkeys-grid kbd { background: var(--border); border-radius: 4px; padding: 2px 7px; font-family: monospace; font-size: 0.7rem; white-space: nowrap; }
+    .hotkey-hint { position: fixed; bottom: 20px; right: 24px; font-size: 0.65rem; color: var(--muted); cursor: pointer; z-index: 400; }
+    .hotkey-hint kbd { background: var(--border); border-radius: 3px; padding: 1px 5px; font-family: monospace; }
+
     /* ── Section headers ── */
     .section-header {
       display: flex; align-items: center; gap: 10px;
@@ -574,6 +597,10 @@
       <div class="kpi-value" id="kpiRequests">—</div>
     </div>
     <div class="kpi">
+      <div class="kpi-label">SLOs Healthy <span class="kpi-dd-badge">↗ DD</span></div>
+      <div class="kpi-value green" id="kpiSlos">—</div>
+    </div>
+    <div class="kpi">
       <div class="kpi-label">Auto Traffic</div>
       <div class="kpi-value" id="kpiAutoStatus" style="font-size:0.9rem;color:var(--subtle);">—</div>
     </div>
@@ -643,6 +670,13 @@
       <h3>Traffic Burst</h3>
       <p>Fire 50 rapid orders across random brands and channels to generate a burst of APM traces and business metrics.</p>
       <button class="btn-scenario-blue" onclick="trafficBurst()">Fire 50 Orders</button>
+    </div>
+
+    <div class="scenario-card" style="border-color:#632ca644;">
+      <h3>🚀 Deploy v2.0</h3>
+      <p>Send a deployment event marker to Datadog + 60s latency burst across all services. Shows on APM dashboards and timelines.</p>
+      <button class="btn-purple" onclick="deployVersion()">Deploy v2.0</button>
+      <div id="deployResult" style="font-size:0.72rem;margin-top:8px;color:var(--subtle);min-height:16px;"></div>
     </div>
 
   </div>
@@ -808,6 +842,9 @@
       const slowOn      = flagsData[slowFlag]   || false;
       const chaosOn     = flagsData[chaosFlag]  || false;
 
+      const score = brandHealthScore(b);
+      const hcol  = healthColor(score);
+
       return `
       <div class="brand-card" id="card-${b.key}">
         <div class="brand-card-accent" style="background:${b.color};"></div>
@@ -820,7 +857,13 @@
             <div class="brand-team">team:${b.team}</div>
           </div>
 
-          <div class="status-badge ${statusClass}">${statusLabel}</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div class="status-badge ${statusClass}" style="margin-bottom:0;">${statusLabel}</div>
+            <div class="health-score" style="flex:1;margin:0;">
+              <div class="health-bar"><div class="health-fill" style="width:${score}%;background:${hcol};"></div></div>
+              <div class="health-num" style="color:${hcol};">${score}</div>
+            </div>
+          </div>
 
           <div class="brand-metrics">
             <div class="bm">
@@ -1022,6 +1065,49 @@
         kpi.style.fontSize = '1rem';
       }
     } catch(_) {}
+  }
+
+  // ── Brand health score ───────────────────────────────────
+  function brandHealthScore(b) {
+    if (b.status === 'chaos')   return 0;
+    if (b.status === 'outage')  return 15;
+    if (b.status === 'degraded') return Math.max(40, 65 - Math.min(25, (b.metrics.errors || 0) * 3));
+    return Math.max(60, 100 - Math.min(40, (b.metrics.errors || 0) * 2));
+  }
+  function healthColor(s) { return s >= 80 ? 'var(--green)' : s >= 50 ? 'var(--yellow)' : 'var(--red)'; }
+
+  // ── SLO status ───────────────────────────────────────────
+  async function loadSloStatus() {
+    try {
+      const res = await fetch('/api/datadog/slos');
+      if (!res.ok) return;
+      const d  = await res.json();
+      const el = document.getElementById('kpiSlos');
+      if (!el) return;
+      if (!d.total) { el.textContent = '—'; return; }
+      el.textContent = `${d.ok} / ${d.total}`;
+      el.className   = 'kpi-value' + (d.breached > 0 ? ' red' : d.warn > 0 ? ' yellow' : ' green');
+    } catch(_) {}
+  }
+
+  // ── Deploy scenario ──────────────────────────────────────
+  async function deployVersion() {
+    const btns   = document.querySelectorAll('[onclick="deployVersion()"]');
+    const result = document.getElementById('deployResult');
+    btns.forEach(b => b.disabled = true);
+    if (result) { result.textContent = 'Sending deployment event…'; result.style.color = 'var(--dd)'; }
+    const res = await api('POST', '/api/deploy', {}, null);
+    if (res.ok) {
+      if (result) {
+        result.textContent = `✓ v${res.data.version} deployed — 60s latency burst active`;
+        result.style.color = 'var(--green)';
+      }
+    } else {
+      if (result) { result.textContent = 'Deploy failed'; result.style.color = 'var(--red)'; }
+      btns.forEach(b => b.disabled = false);
+      return;
+    }
+    setTimeout(() => btns.forEach(b => b.disabled = false), 65000);
   }
 
   async function loadDDStats() {
@@ -1282,7 +1368,18 @@
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter' && document.activeElement.id === 'chatInput' && !e.shiftKey) {
-      e.preventDefault(); sendChat();
+      e.preventDefault(); sendChat(); return;
+    }
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+    const k = e.key;
+    if (k === '?') { document.getElementById('hotkeysHelp').classList.toggle('visible'); return; }
+    if (k === '0') { allClear(); return; }
+    if (k === 't' || k === 'T') { trafficBurst(); return; }
+    if (k === 'l' || k === 'L') { floodLogs(); return; }
+    if (k === 'd' || k === 'D') { deployVersion(); return; }
+    const idx = parseInt(k, 10);
+    if (idx >= 1 && idx <= 6 && brandsData[idx - 1]) {
+      toggleFlag(`${brandsData[idx - 1].key}-chaos`, null);
     }
   });
 
@@ -1388,10 +1485,12 @@
     loadAlerts();
     loadTrafficRate();
     loadDDStats();
+    loadSloStatus();
     api('GET', '/health', null, null);
     setInterval(() => { loadBrands(); loadFlags(); }, 3000);
     setInterval(loadAlerts, 15000);
     setInterval(loadDDStats, 30000);
+    setInterval(loadSloStatus, 30000);
   }
 
   init();
@@ -1415,5 +1514,17 @@
     <button id="chatSend" onclick="sendChat()">Send</button>
   </div>
 </div>
+<div id="hotkeysHelp" class="hotkeys-help">
+  <div class="hotkeys-title">⌨ Presenter Hotkeys</div>
+  <div class="hotkeys-grid">
+    <kbd>1</kbd>–<kbd>6</kbd><span>Toggle brand chaos (Arby's→JJ)</span>
+    <kbd>0</kbd><span>All clear — reset everything</span>
+    <kbd>T</kbd><span>Fire 50-order traffic burst</span>
+    <kbd>L</kbd><span>Flood logs to Datadog</span>
+    <kbd>D</kbd><span>Deploy v2.0 event</span>
+    <kbd>?</kbd><span>Toggle this menu</span>
+  </div>
+</div>
+<div class="hotkey-hint" onclick="document.getElementById('hotkeysHelp').classList.toggle('visible')">Press <kbd>?</kbd> for shortcuts</div>
 </body>
 </html>

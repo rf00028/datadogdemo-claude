@@ -351,8 +351,10 @@ app.post('/api/:brand/orders', async (req, res) => {
     span.setTag('team',  b.team);
 
     const slowPos  = evalFlag(`${brand}-slow-pos`);
+    const deploying = deployBurstUntil > Date.now();
     const baseMs   = Math.floor(Math.random() * 300) + 50;
-    const delayMs  = slowPos ? baseMs * 3 : baseMs;
+    const delayMs  = slowPos ? baseMs * 3 : deploying ? baseMs * 2 : baseMs;
+    if (deploying) span.setTag('deployment_burst', true);
     await new Promise(r => setTimeout(r, delayMs));
 
     const { channel = 'in-store', loyaltyId, itemId } = req.body;
@@ -595,6 +597,11 @@ app.post('/api/flags/:name/toggle', (req, res) => {
           dogstatsd.histogram('pos.processing_time', 3000 + Math.floor(Math.random() * 3000), [`brand:${brand}`, `team:${b.team}`, 'slow_pos:true', 'error_type:chaos']);
         }
         logger.error('chaos.activated', { brand, team: b.team, message: 'Full chaos mode activated — all services degraded' });
+        // Fire slow queries to surface in DBM during chaos
+        if (dbReady) {
+          dbQuery(`SELECT pg_sleep(1.5), count(*), sum(orders), sum(revenue) FROM brand_metrics WHERE brand = $1`, [brand]).catch(() => {});
+          dbQuery(`SELECT b.brand, count(*) FROM brand_metrics b JOIN feature_flags f ON b.brand = f.key WHERE b.ts > NOW() - INTERVAL '1 hour' GROUP BY b.brand ORDER BY count(*) DESC`, []).catch(() => {});
+        }
       } else {
         logger.info('chaos.cleared', { brand, team: b.team, message: 'Chaos mode cleared — services restored' });
       }
@@ -1055,6 +1062,66 @@ app.get('/api/security/file', (req, res) => {
   logger.info('security.file_request', { path: filePath, ip: req.ip });
   dogstatsd.increment('security.file_requests', 1, ['endpoint:file']);
   res.json({ file: filePath, content: 'demo content', timestamp: new Date().toISOString() });
+});
+
+// ── Deployment event + 60s burst ─────────────────────────
+let deployBurstUntil = 0;
+
+app.post('/api/deploy', async (req, res) => {
+  const apiKey = process.env.DD_API_KEY;
+  const appKey = process.env.DD_APP_KEY;
+  const site   = process.env.DD_SITE || 'datadoghq.com';
+  const { version = '2.0.0' } = req.body;
+
+  deployBurstUntil = Date.now() + 60000;
+
+  if (apiKey && appKey) {
+    fetch(`https://api.${site}/api/v1/events`, {
+      method:  'POST',
+      headers: { 'DD-API-KEY': apiKey, 'DD-APPLICATION-KEY': appKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:            `Deployment: ${CUSTOMER.platform} v${version}`,
+        text:             `%%% \nNew version **v${version}** deployed to \`${process.env.DD_ENV || 'local'}\`\n\n**Services restarting:** ${1 + BRAND_KEYS.length * 3}\n\n**Team:** ${CUSTOMER.platformTeamName}\n %%%`,
+        tags:             [`env:${process.env.DD_ENV || 'local'}`, `service:${CUSTOMER.platform}`, `version:${version}`],
+        alert_type:       'info',
+        source_type_name: 'My Apps',
+      }),
+    }).catch(() => {});
+  }
+
+  dogstatsd.event(`Deployment: v${version}`, `${CUSTOMER.platform} v${version} deployed`, {
+    alertType: 'info',
+    tags:      [`version:${version}`, `env:${process.env.DD_ENV || 'local'}`],
+  });
+  logger.info('deployment.started', { version, env: process.env.DD_ENV, burst_ms: 60000 });
+  res.json({ ok: true, version, burstDurationMs: 60000 });
+});
+
+// ── SLO status (KPI source) ───────────────────────────────
+app.get('/api/datadog/slos', async (req, res) => {
+  const apiKey = process.env.DD_API_KEY;
+  const appKey = process.env.DD_APP_KEY;
+  const site   = process.env.DD_SITE || 'datadoghq.com';
+  if (!apiKey || !appKey) return res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0 });
+
+  try {
+    const r = await fetch(`https://api.${site}/api/v1/slo?tags=service%3A${CUSTOMER.platform}&limit=50`, {
+      headers: { 'DD-API-KEY': apiKey, 'DD-APPLICATION-KEY': appKey },
+    });
+    if (!r.ok) return res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0 });
+    const data = await r.json();
+    const slos = (data.data || []).map(s => ({
+      id:     s.id,
+      name:   s.name,
+      status: s.overall_status || 'No Data',
+    }));
+    const ok      = slos.filter(s => s.status === 'OK').length;
+    const breached= slos.filter(s => ['BREACHED','Breached','Error'].includes(s.status)).length;
+    const warn    = slos.filter(s => ['WARNING','Warn','Warning'].includes(s.status)).length;
+    res.json({ slos, total: slos.length, ok, breached, warn });
+  } catch (e) {
+    res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0, error: e.message });
+  }
 });
 
 // ── Datadog metrics summary (KPI source of truth) ────────
