@@ -861,7 +861,10 @@
             <div class="status-badge ${statusClass}" style="margin-bottom:0;">${statusLabel}</div>
             <div class="health-score" style="flex:1;margin:0;">
               <div class="health-bar"><div class="health-fill" style="width:${score}%;background:${hcol};"></div></div>
-              <div class="health-num" style="color:${hcol};">${score}</div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:36px;gap:1px;">
+                <div style="font-size:0.48rem;color:var(--subtle);text-transform:uppercase;letter-spacing:0.06em;line-height:1;">HEALTH</div>
+                <div class="health-num" style="color:${hcol};line-height:1;">${score}</div>
+              </div>
             </div>
           </div>
 
