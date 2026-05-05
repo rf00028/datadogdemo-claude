@@ -1057,6 +1057,48 @@ app.get('/api/security/file', (req, res) => {
   res.json({ file: filePath, content: 'demo content', timestamp: new Date().toISOString() });
 });
 
+// ── Datadog metrics summary (KPI source of truth) ────────
+app.get('/api/datadog/summary', async (req, res) => {
+  const apiKey = process.env.DD_API_KEY;
+  const appKey = process.env.DD_APP_KEY;
+  const site   = process.env.DD_SITE || 'datadoghq.com';
+
+  if (!apiKey || !appKey) return res.json({ error: 'DD keys not configured', fromDD: false });
+
+  const now  = Math.floor(Date.now() / 1000);
+  const from = now - 86400; // last 24 hours
+
+  async function ddMetric(query) {
+    try {
+      const qs = new URLSearchParams({ from, to: now, query });
+      const r  = await fetch(`https://api.${site}/api/v1/query?${qs}`, {
+        headers: { 'DD-API-KEY': apiKey, 'DD-APPLICATION-KEY': appKey },
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      const pts  = data.series?.[0]?.pointlist || [];
+      return pts.reduce((s, [, v]) => s + (v || 0), 0);
+    } catch { return null; }
+  }
+
+  const pfx = CUSTOMER.metricPrefix;
+  const [orders, revenue, errors, requests] = await Promise.all([
+    ddMetric(`sum:${pfx}.orders.created{*}.as_count()`),
+    ddMetric(`sum:${pfx}.orders.revenue{*}.as_count()`),
+    ddMetric(`sum:${pfx}.pos.errors{*}.as_count()`),
+    ddMetric(`sum:${pfx}.http.requests{*}.as_count()`),
+  ]);
+
+  res.json({
+    orders:      orders   !== null ? Math.round(orders)          : null,
+    revenue:     revenue  !== null ? +revenue.toFixed(2)          : null,
+    errors:      errors   !== null ? Math.round(errors)           : null,
+    requests:    requests !== null ? Math.round(requests)         : null,
+    fromDD:      true,
+    windowHours: 24,
+  });
+});
+
 // ── Presenter (admin demo controls) ──────────────────────
 app.get('/presenter', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'presenter.html'));

@@ -94,6 +94,7 @@
       padding: 16px 20px;
     }
     .kpi-label { font-size: 0.72rem; color: var(--subtle); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .kpi-dd-badge { color: var(--dd); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em; vertical-align: middle; }
     .kpi-value { font-size: 1.6rem; font-weight: 700; color: #fff; }
     .kpi-value.green { color: var(--green); }
     .kpi-value.red   { color: var(--red);   }
@@ -553,28 +554,28 @@
   <!-- ── Platform KPIs ── -->
   <div class="kpi-row">
     <div class="kpi">
-      <div class="kpi-label">Total Orders</div>
-      <div class="kpi-value green" id="kpiOrders">0</div>
+      <div class="kpi-label">Total Orders <span class="kpi-dd-badge">↗ DD</span></div>
+      <div class="kpi-value green" id="kpiOrders">—</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Total Revenue</div>
-      <div class="kpi-value green" id="kpiRevenue">$0.00</div>
+      <div class="kpi-label">Total Revenue <span class="kpi-dd-badge">↗ DD</span></div>
+      <div class="kpi-value green" id="kpiRevenue">—</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Platform Errors</div>
-      <div class="kpi-value" id="kpiErrors">0</div>
+      <div class="kpi-label">Platform Errors <span class="kpi-dd-badge">↗ DD</span></div>
+      <div class="kpi-value" id="kpiErrors">—</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Brands Online</div>
       <div class="kpi-value" id="kpiBrands">—</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Requests Sent</div>
-      <div class="kpi-value" id="kpiRequests">0</div>
+      <div class="kpi-label">HTTP Requests <span class="kpi-dd-badge">↗ DD</span></div>
+      <div class="kpi-value" id="kpiRequests">—</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Auto Traffic</div>
-      <div class="kpi-value" id="kpiAutoStatus" style="font-size:0.9rem;color:var(--subtle);">OFF</div>
+      <div class="kpi-value" id="kpiAutoStatus" style="font-size:0.9rem;color:var(--subtle);">—</div>
     </div>
   </div>
 
@@ -1013,6 +1014,37 @@
       });
       const desc = document.getElementById('trafficRateDesc');
       if (desc) desc.textContent = RATE_DESCS[rate] || '';
+      const kpi = document.getElementById('kpiAutoStatus');
+      if (kpi) {
+        const on = rate !== 'off';
+        kpi.textContent  = on ? rate.toUpperCase() : 'OFF';
+        kpi.style.color  = on ? 'var(--green)' : 'var(--subtle)';
+        kpi.style.fontSize = '1rem';
+      }
+    } catch(_) {}
+  }
+
+  async function loadDDStats() {
+    try {
+      const res  = await fetch('/api/datadog/summary');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.fromDD) return;
+
+      if (data.orders !== null) {
+        document.getElementById('kpiOrders').textContent = data.orders.toLocaleString();
+      }
+      if (data.revenue !== null) {
+        document.getElementById('kpiRevenue').textContent = '$' + data.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 });
+      }
+      if (data.errors !== null) {
+        const errEl = document.getElementById('kpiErrors');
+        errEl.textContent = data.errors.toLocaleString();
+        errEl.className   = 'kpi-value' + (data.errors > 0 ? ' red' : ' green');
+      }
+      if (data.requests !== null) {
+        document.getElementById('kpiRequests').textContent = data.requests.toLocaleString();
+      }
     } catch(_) {}
   }
 
@@ -1355,9 +1387,11 @@
     await loadFlags();
     loadAlerts();
     loadTrafficRate();
+    loadDDStats();
     api('GET', '/health', null, null);
     setInterval(() => { loadBrands(); loadFlags(); }, 3000);
     setInterval(loadAlerts, 15000);
+    setInterval(loadDDStats, 30000);
   }
 
   init();
