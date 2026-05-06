@@ -1110,11 +1110,50 @@ app.post('/api/deploy', async (req, res) => {
   res.json({ ok: true, version, burstDurationMs: 60000 });
 });
 
+// ── DBM helpers ──────────────────────────────────────────
+async function fetchDDSlowQueries(apiKey, appKey, site) {
+  const now  = Math.floor(Date.now() / 1000);
+  const from = now - 3600;
+  const base = `https://api.${site}/api/v1/query`;
+  const hdrs = { 'DD-API-KEY': apiKey, 'DD-APPLICATION-KEY': appKey };
+  const tQ = encodeURIComponent('sum:postgresql.queries.time{*}by{query_signature}');
+  const cQ = encodeURIComponent('sum:postgresql.queries.count{*}by{query_signature}');
+  const [tR, cR] = await Promise.all([
+    fetch(`${base}?from=${from}&to=${now}&query=${tQ}`, { headers: hdrs }),
+    fetch(`${base}?from=${from}&to=${now}&query=${cQ}`, { headers: hdrs }),
+  ]);
+  if (!tR.ok) return null;
+  const tData = await tR.json();
+  const cData = cR.ok ? await cR.json() : { series: [] };
+  const sigMap = {};
+  for (const s of (tData.series || [])) {
+    const sig = (s.tag_set || []).find(t => t.startsWith('query_signature:'))?.slice('query_signature:'.length);
+    if (!sig) continue;
+    sigMap[sig] = { totalTime: (s.pointlist || []).reduce((a, [, v]) => a + (v || 0), 0), calls: 0 };
+  }
+  for (const s of (cData.series || [])) {
+    const sig = (s.tag_set || []).find(t => t.startsWith('query_signature:'))?.slice('query_signature:'.length);
+    if (sig && sigMap[sig]) sigMap[sig].calls = (s.pointlist || []).reduce((a, [, v]) => a + (v || 0), 0);
+  }
+  const rows = Object.entries(sigMap)
+    .filter(([, d]) => d.calls > 0)
+    .map(([sig, { totalTime, calls }]) => ({
+      query:  sig,
+      calls:  Math.round(calls),
+      meanMs: (totalTime / calls / 1_000_000).toFixed(3), // ns → ms
+      fromDD: true,
+      ddLink: `https://app.datadoghq.com/databases/queries?dbms=postgres&query_signature=${sig}`,
+    }))
+    .sort((a, b) => parseFloat(b.meanMs) - parseFloat(a.meanMs))
+    .slice(0, 5);
+  return rows.length ? rows : null;
+}
+
 // ── DBM stats ────────────────────────────────────────────
 app.get('/api/dbm/stats', async (req, res) => {
   if (!dbReady) return res.json({ ready: false });
   try {
-    const [activity, tbl, slowLog] = await Promise.all([
+    const [activity, tbl] = await Promise.all([
       dbQuery(`SELECT
         count(*) AS connections,
         count(*) FILTER (WHERE state='active') AS active,
@@ -1123,30 +1162,45 @@ app.get('/api/dbm/stats', async (req, res) => {
         FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()`),
       dbQuery(`SELECT count(*) AS total_rows, count(DISTINCT brand) AS brands,
                max(ts) AS last_ts FROM brand_metrics`),
-      dbQuery(`SELECT query, calls, mean_exec_time, max_exec_time, rows
-               FROM pg_stat_statements
-               WHERE dbid = (SELECT oid FROM pg_database WHERE datname=current_database())
-               ORDER BY mean_exec_time DESC LIMIT 5`),
     ]);
     const a = activity?.rows?.[0] || {};
     const t = tbl?.rows?.[0]      || {};
-    const slowQueries = (slowLog?.rows || []).map(r => ({
-      query:    r.query.slice(0, 80),
-      calls:    parseInt(r.calls),
-      meanMs:   parseFloat(r.mean_exec_time).toFixed(1),
-      maxMs:    parseFloat(r.max_exec_time).toFixed(1),
-    }));
+
+    // Try Datadog first; fall back to local pg_stat_statements
+    const apiKey = process.env.DD_API_KEY;
+    const appKey = process.env.DD_APP_KEY;
+    const site   = process.env.DD_SITE || 'datadoghq.com';
+    let topSlowQueries = null;
+    let slowFromDD = false;
+    if (apiKey && appKey) {
+      try { topSlowQueries = await fetchDDSlowQueries(apiKey, appKey, site); if (topSlowQueries) slowFromDD = true; } catch {}
+    }
+    if (!topSlowQueries) {
+      const slowLog = await dbQuery(`SELECT query, calls, mean_exec_time, max_exec_time
+        FROM pg_stat_statements
+        WHERE dbid = (SELECT oid FROM pg_database WHERE datname=current_database())
+        ORDER BY mean_exec_time DESC LIMIT 5`);
+      topSlowQueries = (slowLog?.rows || []).map(r => ({
+        query:  r.query.slice(0, 80),
+        calls:  parseInt(r.calls),
+        meanMs: parseFloat(r.mean_exec_time).toFixed(1),
+        maxMs:  parseFloat(r.max_exec_time).toFixed(1),
+        fromDD: false,
+      }));
+    }
+
     res.json({
-      ready:        true,
-      connections:  parseInt(a.connections) || 0,
-      activeQueries:parseInt(a.active)      || 0,
-      slowNow:      parseInt(a.slow)        || 0,
-      maxLatencyMs: parseFloat(a.max_ms)    || 0,
-      totalRows:    parseInt(t.total_rows)  || 0,
-      brands:       parseInt(t.brands)      || 0,
-      lastWrite:    t.last_ts               || null,
-      topSlowQueries: slowQueries,
-      dbmUrl: `https://app.datadoghq.com/databases/queries?host=localhost&dbname=${process.env.PGDATABASE || 'inspire_brands'}`,
+      ready:         true,
+      connections:   parseInt(a.connections) || 0,
+      activeQueries: parseInt(a.active)      || 0,
+      slowNow:       parseInt(a.slow)        || 0,
+      maxLatencyMs:  parseFloat(a.max_ms)    || 0,
+      totalRows:     parseInt(t.total_rows)  || 0,
+      brands:        parseInt(t.brands)      || 0,
+      lastWrite:     t.last_ts              || null,
+      topSlowQueries,
+      slowFromDD,
+      dbmUrl: `https://app.datadoghq.com/databases/queries?dbms=postgres`,
     });
   } catch (e) {
     res.json({ ready: true, error: e.message, connections: 0, activeQueries: 0, slowNow: 0 });

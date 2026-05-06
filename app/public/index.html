@@ -765,8 +765,8 @@
     </div>
 
     <div class="tool-card" style="border-color:#a855f733;">
-      <h3>🐢 Top Slow Queries</h3>
-      <p>Highest mean execution time from <code style="color:#c084fc;">pg_stat_statements</code>. Chaos mode injects <code style="color:#c084fc;">pg_sleep(1.5)</code> to simulate slow DB queries visible in Datadog DBM.</p>
+      <h3 id="dbmSlowHeader">🐢 Top Slow Queries</h3>
+      <p>Highest mean execution time sourced from Datadog DBM (<code style="color:#c084fc;">postgresql.queries.time</code> by <code style="color:#c084fc;">query_signature</code>, last hour). Click a row to view in Datadog.</p>
       <div id="dbmSlowTable" style="font-size:0.68rem;color:var(--subtle);line-height:1.8;">Loading…</div>
       <div style="margin-top:10px;display:flex;gap:8px;">
         <button class="btn-purple" onclick="loadDbmStats()" style="font-size:0.72rem;padding:5px 12px;">Refresh</button>
@@ -1193,16 +1193,26 @@
       note.style.color = d.slowNow > 0 ? 'var(--red)' : 'var(--subtle)';
 
       const tbl = document.getElementById('dbmSlowTable');
+      const srcBadge = d.slowFromDD
+        ? `<span style="font-size:0.65rem;background:var(--dd-purple,#6B5AED);color:#fff;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;">Datadog</span>`
+        : `<span style="font-size:0.65rem;background:var(--muted);color:var(--bg);padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;">local</span>`;
+      const slowHdr = document.getElementById('dbmSlowHeader');
+      if (slowHdr) slowHdr.innerHTML = 'Top Slow Queries' + srcBadge;
       if (!d.topSlowQueries?.length) {
-        tbl.textContent = 'No pg_stat_statements data yet — run some queries first';
+        tbl.textContent = d.slowFromDD ? 'No query data in Datadog yet — run some traffic first' : 'No pg_stat_statements data yet — run some queries first';
         return;
       }
-      tbl.innerHTML = d.topSlowQueries.map(q => `
+      tbl.innerHTML = d.topSlowQueries.map(q => {
+        const label = q.fromDD
+          ? `<a href="${q.ddLink}" target="_blank" style="color:var(--text);text-decoration:none;" title="View in Datadog DBM">🔍 ${q.query}</a>`
+          : `<span title="${q.query}">${q.query}</span>`;
+        return `
         <div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--border);">
-          <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);" title="${q.query}">${q.query}</div>
+          <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);">${label}</div>
           <div style="flex-shrink:0;color:${parseFloat(q.meanMs)>500?'var(--red)':parseFloat(q.meanMs)>100?'var(--yellow)':'var(--green)'};">${q.meanMs}ms</div>
           <div style="flex-shrink:0;color:var(--muted);">${q.calls}×</div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     } catch(_) {}
   }
 
