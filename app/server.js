@@ -1,4 +1,5 @@
-const CUSTOMER = require('./customer.config');
+const CUSTOMER   = require('./customer.config');
+const LOCATIONS  = require('./locations.config');
 
 // dd-trace MUST be initialized before any other requires
 const tracer = require('dd-trace').init({
@@ -63,8 +64,11 @@ const DD_BASE_TAGS = `env:${process.env.DD_ENV || 'local'},version:${process.env
 // log attributes (@brand:x) AND Datadog tags (brand:x)
 const brandTagFormat = winston.format((info) => {
   const extraTags = [];
-  if (info.brand) extraTags.push(`brand:${info.brand}`);
-  if (info.team)  extraTags.push(`team:${info.team}`);
+  if (info.brand)    extraTags.push(`brand:${info.brand}`);
+  if (info.team)     extraTags.push(`team:${info.team}`);
+  if (info.region)   extraTags.push(`region:${info.region}`);
+  if (info.state)    extraTags.push(`state:${info.state}`);
+  if (info.store_id) extraTags.push(`store_id:${info.store_id}`);
   if (extraTags.length) {
     info.ddtags = `${DD_BASE_TAGS},${extraTags.join(',')}`;
   } else {
@@ -103,6 +107,23 @@ const dogstatsd = new StatsD({
 const BRANDS = Object.fromEntries(CUSTOMER.brands.map(b => [b.key, b]));
 
 const BRAND_KEYS = Object.keys(BRANDS);
+
+// ── Store location helpers ────────────────────────────────
+function pickStore(brand) {
+  const stores = LOCATIONS[brand];
+  if (!stores || !stores.length) return null;
+  return stores[Math.floor(Math.random() * stores.length)];
+}
+
+function storeTags(store) {
+  if (!store) return [];
+  return [
+    `region:${store.region}`,
+    `state:${store.state}`,
+    `city:${store.city.toLowerCase().replace(/ /g, '_')}`,
+    `store_id:${store.store_id}`,
+  ];
+}
 
 // ── In-memory state ───────────────────────────────────────
 const brandOrders  = Object.fromEntries(BRAND_KEYS.map(b => [b, []]));
@@ -206,7 +227,7 @@ async function flushMetricsToDB() {
 }
 
 // ── Helpers ───────────────────────────────────────────────
-function tagBrand(brand) {
+function tagBrand(brand, store) {
   const b = BRANDS[brand];
   if (!b) return;
   const span = tracer.scope().active();
@@ -214,6 +235,12 @@ function tagBrand(brand) {
     span.setTag('brand',      brand);
     span.setTag('brand.name', b.name);
     span.setTag('team',       b.team);
+    if (store) {
+      span.setTag('region',   store.region);
+      span.setTag('state',    store.state);
+      span.setTag('city',     store.city);
+      span.setTag('store_id', store.store_id);
+    }
   }
 }
 
@@ -332,13 +359,15 @@ app.post('/api/:brand/orders', async (req, res) => {
   const { brand } = req.params;
   if (!BRANDS[brand]) return res.status(404).json({ error: `Unknown brand: ${brand}` });
 
-  const b = BRANDS[brand];
-  tagBrand(brand);
+  const b     = BRANDS[brand];
+  const store = pickStore(brand);
+  tagBrand(brand, store);
 
   if (evalFlag(`${brand}-pos-outage`)) {
     brandMetrics[brand].errors++;
-    logger.error('pos.outage', { brand, team: b.team, message: 'POS system unavailable — flag active' });
-    dogstatsd.increment('pos.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'error_type:outage']);
+    const sTags = storeTags(store);
+    logger.error('pos.outage', { brand, team: b.team, message: 'POS system unavailable — flag active', ...(store && { region: store.region, state: store.state, city: store.city, store_id: store.store_id }) });
+    dogstatsd.increment('pos.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'error_type:outage', ...sTags]);
     return res.status(503).json({ error: 'POS system temporarily unavailable', brand: b.name, retry_after: 30 });
   }
 
@@ -352,6 +381,12 @@ app.post('/api/:brand/orders', async (req, res) => {
   }, async (span) => {
     span.setTag('brand', brand);
     span.setTag('team',  b.team);
+    if (store) {
+      span.setTag('region',   store.region);
+      span.setTag('state',    store.state);
+      span.setTag('city',     store.city);
+      span.setTag('store_id', store.store_id);
+    }
 
     // 1. Cache lookup for menu data
     await tracer.trace('cache.menu_lookup', {
@@ -426,18 +461,20 @@ app.post('/api/:brand/orders', async (req, res) => {
     span.setTag('channel',     channel);
     span.setTag('slow_pos',    slowPos);
 
+    const sTags = storeTags(store);
     logger.info('order.created', {
       brand, team: b.team, orderId: order.id, item: order.item,
       total: order.total, channel, slow_pos: slowPos, processing_ms: delayMs,
       payment_method: paymentMethod,
+      ...(store && { region: store.region, state: store.state, city: store.city, store_id: store.store_id }),
     });
 
-    dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`]);
-    dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`]);
-    dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`]);
-    dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slowPos}`]);
+    dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`, ...sTags]);
+    dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`, ...sTags]);
+    dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`, ...sTags]);
+    dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slowPos}`, ...sTags]);
 
-    res.status(201).json(order);
+    res.status(201).json({ ...order, ...(store && { store_id: store.store_id, city: store.city, state: store.state, region: store.region }) });
   });
 });
 
@@ -633,11 +670,14 @@ app.post('/api/flags/:name/toggle', (req, res) => {
     if (BRANDS[brand]) {
       const b = BRANDS[brand];
       if (newValue) {
+        const brandStores = LOCATIONS[brand] || [];
         for (let i = 0; i < 12; i++) {
-          dogstatsd.increment('pos.errors',    1, [`brand:${brand}`, `team:${b.team}`, 'error_type:chaos']);
-          dogstatsd.increment('http.requests', 1, [`status:500`, `method:POST`, `brand:${brand}`, `team:${b.team}`]);
+          const cs = brandStores.length ? brandStores[Math.floor(Math.random() * brandStores.length)] : null;
+          const csTags = storeTags(cs);
+          dogstatsd.increment('pos.errors',    1, [`brand:${brand}`, `team:${b.team}`, 'error_type:chaos', ...csTags]);
+          dogstatsd.increment('http.requests', 1, [`status:500`, `method:POST`, `brand:${brand}`, `team:${b.team}`, ...csTags]);
           // High latency values so p95 latency monitor fires (chaos returns 503 before the normal histogram runs)
-          dogstatsd.histogram('pos.processing_time', 3000 + Math.floor(Math.random() * 3000), [`brand:${brand}`, `team:${b.team}`, 'slow_pos:true', 'error_type:chaos']);
+          dogstatsd.histogram('pos.processing_time', 3000 + Math.floor(Math.random() * 3000), [`brand:${brand}`, `team:${b.team}`, 'slow_pos:true', 'error_type:chaos', ...csTags]);
         }
         logger.error('chaos.activated', { brand, team: b.team, message: 'Full chaos mode activated — all services degraded' });
         // Fire slow queries to surface in DBM during chaos
@@ -1476,10 +1516,12 @@ async function fireBackgroundOrder(brand) {
 
   const outage = FLAGS[`${brand}-pos-outage`]?.enabled;
   const slow   = FLAGS[`${brand}-slow-pos`]?.enabled;
+  const store  = pickStore(brand);
+  const sTags  = storeTags(store);
 
   if (outage) {
     brandMetrics[brand].errors++;
-    dogstatsd.increment('pos.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'error_type:outage', 'source:background']);
+    dogstatsd.increment('pos.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'error_type:outage', 'source:background', ...sTags]);
     return;
   }
 
@@ -1492,6 +1534,12 @@ async function fireBackgroundOrder(brand) {
     span.setTag('team',     b.team);
     span.setTag('source',   'background');
     span.setTag('slow_pos', slow);
+    if (store) {
+      span.setTag('region',   store.region);
+      span.setTag('state',    store.state);
+      span.setTag('city',     store.city);
+      span.setTag('store_id', store.store_id);
+    }
 
     // 1. Cache lookup for menu
     await tracer.trace('cache.menu_lookup', {
@@ -1578,10 +1626,10 @@ async function fireBackgroundOrder(brand) {
     brandMetrics[brand].totalOrders++;
     brandMetrics[brand].totalRevenue += order.total;
 
-    dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`, 'source:background']);
-    dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`]);
-    dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`]);
-    dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slow}`]);
+    dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`, 'source:background', ...sTags]);
+    dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`, ...sTags]);
+    dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`, ...sTags]);
+    dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slow}`, ...sTags]);
 
     // 4. Loyalty lookup (~40% of orders)
     if (Math.random() < 0.4 && !FLAGS[`${brand}-chaos`]?.enabled) {
@@ -1595,16 +1643,22 @@ async function fireBackgroundOrder(brand) {
         loySpan.setTag('brand',    brand);
         loySpan.setTag('team',     b.team);
         loySpan.setTag('degraded', degraded);
+        if (store) {
+          loySpan.setTag('region',   store.region);
+          loySpan.setTag('state',    store.state);
+          loySpan.setTag('city',     store.city);
+          loySpan.setTag('store_id', store.store_id);
+        }
         if (degraded && Math.random() < 0.4) {
           loySpan.setTag('error', true);
-          dogstatsd.increment('loyalty.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'source:background']);
+          dogstatsd.increment('loyalty.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'source:background', ...sTags]);
         } else {
           const points  = Math.floor(Math.random() * 5000) + 100;
           const latency = degraded ? Math.random() * 2000 + 400 : Math.random() * 200 + 20;
           await new Promise(r => setTimeout(r, latency));
           loySpan.setTag('loyalty.points', points);
-          dogstatsd.histogram('loyalty.lookup_latency', latency, [`brand:${brand}`, `team:${b.team}`]);
-          dogstatsd.gauge('loyalty.member_points',       points,  [`brand:${brand}`, `team:${b.team}`]);
+          dogstatsd.histogram('loyalty.lookup_latency', latency, [`brand:${brand}`, `team:${b.team}`, ...sTags]);
+          dogstatsd.gauge('loyalty.member_points',       points,  [`brand:${brand}`, `team:${b.team}`, ...sTags]);
         }
       });
     }
