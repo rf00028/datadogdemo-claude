@@ -342,6 +342,8 @@ app.post('/api/:brand/orders', async (req, res) => {
     return res.status(503).json({ error: 'POS system temporarily unavailable', brand: b.name, retry_after: 30 });
   }
 
+  const PAYMENT_METHODS = ['credit_card', 'debit_card', 'apple_pay', 'google_pay'];
+
   // Child span with brand-specific service name — surfaces as a separate APM service
   await tracer.trace('pos.create_order', {
     service:  `${CUSTOMER.servicePrefix}-${brand}-pos`,
@@ -350,6 +352,20 @@ app.post('/api/:brand/orders', async (req, res) => {
   }, async (span) => {
     span.setTag('brand', brand);
     span.setTag('team',  b.team);
+
+    // 1. Cache lookup for menu data
+    await tracer.trace('cache.menu_lookup', {
+      service:  `${CUSTOMER.servicePrefix}-cache`,
+      resource: `GET menu:${brand}`,
+      type:     'cache',
+    }, async (cacheSpan) => {
+      const hit = Math.random() > 0.12;
+      cacheSpan.setTag('cache.hit', hit);
+      cacheSpan.setTag('component', 'redis');
+      cacheSpan.setTag('brand', brand);
+      dogstatsd.increment('cache.requests', 1, [`brand:${brand}`, `cache:menu`, `hit:${hit}`]);
+      await new Promise(r => setTimeout(r, hit ? 1 : 9));
+    });
 
     const slowPos  = evalFlag(`${brand}-slow-pos`);
     const deploying = deployBurstUntil > Date.now();
@@ -377,6 +393,31 @@ app.post('/api/:brand/orders', async (req, res) => {
       createdAt:    new Date().toISOString(),
     };
 
+    // 2. Payment authorization
+    const paymentMethod = PAYMENT_METHODS[Math.floor(Math.random() * PAYMENT_METHODS.length)];
+    await tracer.trace('payment.process', {
+      service:  `${CUSTOMER.servicePrefix}-payments`,
+      resource: 'POST /v1/payment_intents',
+      type:     'http',
+    }, async (paySpan) => {
+      paySpan.setTag('payment.amount',   order.total);
+      paySpan.setTag('payment.currency', 'usd');
+      paySpan.setTag('payment.method',   paymentMethod);
+      paySpan.setTag('brand', brand);
+      const payLatency = 50 + Math.floor(Math.random() * 150);
+      await new Promise(r => setTimeout(r, payLatency));
+      const declined = Math.random() < 0.02;
+      if (declined) {
+        paySpan.setTag('error', true);
+        paySpan.setTag('payment.status', 'declined');
+        dogstatsd.increment('payment.declined', 1, [`brand:${brand}`, `method:${paymentMethod}`]);
+      } else {
+        paySpan.setTag('payment.status', 'authorized');
+        dogstatsd.increment('payment.authorized', 1, [`brand:${brand}`, `method:${paymentMethod}`]);
+      }
+      dogstatsd.histogram('payment.latency_ms', payLatency, [`brand:${brand}`, `method:${paymentMethod}`]);
+    });
+
     brandOrders[brand].push(order);
     brandMetrics[brand].totalOrders++;
     brandMetrics[brand].totalRevenue += order.total;
@@ -388,6 +429,7 @@ app.post('/api/:brand/orders', async (req, res) => {
     logger.info('order.created', {
       brand, team: b.team, orderId: order.id, item: order.item,
       total: order.total, channel, slow_pos: slowPos, processing_ms: delayMs,
+      payment_method: paymentMethod,
     });
 
     dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`]);
@@ -1383,11 +1425,12 @@ const TRAFFIC_RATES = {
   high:   { ordersPerBrand: 8, intervalMs: 3000  },  // ~160/brand/min
 };
 
+const BG_PAYMENT_METHODS = ['credit_card', 'debit_card', 'apple_pay', 'google_pay'];
+
 async function fireBackgroundOrder(brand) {
   const b = BRANDS[brand];
   if (!b) return;
 
-  // Resolve flags inline — don't go through HTTP to avoid extra APM noise on internal calls
   const outage = FLAGS[`${brand}-pos-outage`]?.enabled;
   const slow   = FLAGS[`${brand}-slow-pos`]?.enabled;
 
@@ -1397,49 +1440,132 @@ async function fireBackgroundOrder(brand) {
     return;
   }
 
-  const channel  = b.channels[Math.floor(Math.random() * b.channels.length)];
-  const item     = b.menu[Math.floor(Math.random() * b.menu.length)];
-  const quantity = Math.random() < 0.2 ? 2 : 1;
-  const baseMs   = Math.floor(Math.random() * 300) + 50;
-  const delayMs  = slow ? baseMs * 3 : baseMs;
+  return tracer.trace('pos.create_order', {
+    service:  `${CUSTOMER.servicePrefix}-${brand}-pos`,
+    resource: `worker/${brand}/order`,
+    type:     'worker',
+  }, async (span) => {
+    span.setTag('brand',    brand);
+    span.setTag('team',     b.team);
+    span.setTag('source',   'background');
+    span.setTag('slow_pos', slow);
 
-  await new Promise(r => setTimeout(r, delayMs));
+    // 1. Cache lookup for menu
+    await tracer.trace('cache.menu_lookup', {
+      service:  `${CUSTOMER.servicePrefix}-cache`,
+      resource: `GET menu:${brand}`,
+      type:     'cache',
+    }, async (cacheSpan) => {
+      const hit = Math.random() > 0.12;
+      cacheSpan.setTag('cache.hit', hit);
+      cacheSpan.setTag('component', 'redis');
+      cacheSpan.setTag('brand', brand);
+      dogstatsd.increment('cache.requests', 1, [`brand:${brand}`, `cache:menu`, `hit:${hit}`]);
+      await new Promise(r => setTimeout(r, hit ? 1 : 9));
+    });
 
-  const order = {
-    id:           uuidv4(),
-    brand,
-    item:         item.name,
-    quantity,
-    total:        +(item.price * quantity).toFixed(2),
-    channel,
-    status:       'confirmed',
-    processingMs: delayMs,
-  };
+    const channel  = b.channels[Math.floor(Math.random() * b.channels.length)];
+    const item     = b.menu[Math.floor(Math.random() * b.menu.length)];
+    const quantity = Math.random() < 0.2 ? 2 : 1;
+    const baseMs   = Math.floor(Math.random() * 300) + 50;
+    const delayMs  = slow ? baseMs * 3 : baseMs;
 
-  brandOrders[brand].push(order);
-  brandMetrics[brand].totalOrders++;
-  brandMetrics[brand].totalRevenue += order.total;
+    await new Promise(r => setTimeout(r, delayMs));
 
-  dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`, 'source:background']);
-  dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`]);
-  dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`]);
-  dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slow}`]);
+    const order = {
+      id:           uuidv4(),
+      brand,
+      item:         item.name,
+      quantity,
+      total:        +(item.price * quantity).toFixed(2),
+      channel,
+      status:       'confirmed',
+      processingMs: delayMs,
+    };
 
-  // Occasional loyalty lookup alongside the order (~40% of orders)
-  if (Math.random() < 0.4) {
-    const degraded = FLAGS['loyalty-degraded']?.enabled;
-    const chaos    = FLAGS[`${brand}-chaos`]?.enabled;
-    if (!chaos) {
-      brandMetrics[brand].loyaltyLookups++;
-      if (degraded && Math.random() < 0.4) {
-        dogstatsd.increment('loyalty.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'source:background']);
+    span.setTag('order.total', order.total);
+    span.setTag('channel',     channel);
+
+    // 2. Payment authorization
+    const paymentMethod = BG_PAYMENT_METHODS[Math.floor(Math.random() * BG_PAYMENT_METHODS.length)];
+    await tracer.trace('payment.process', {
+      service:  `${CUSTOMER.servicePrefix}-payments`,
+      resource: 'POST /v1/payment_intents',
+      type:     'http',
+    }, async (paySpan) => {
+      paySpan.setTag('payment.amount',   order.total);
+      paySpan.setTag('payment.currency', 'usd');
+      paySpan.setTag('payment.method',   paymentMethod);
+      paySpan.setTag('brand', brand);
+      const payLatency = 50 + Math.floor(Math.random() * 150);
+      await new Promise(r => setTimeout(r, payLatency));
+      const declined = Math.random() < 0.02;
+      if (declined) {
+        paySpan.setTag('error', true);
+        paySpan.setTag('payment.status', 'declined');
+        dogstatsd.increment('payment.declined', 1, [`brand:${brand}`, `method:${paymentMethod}`]);
       } else {
-        const points = Math.floor(Math.random() * 5000) + 100;
-        dogstatsd.histogram('loyalty.lookup_latency', degraded ? Math.random() * 2000 + 400 : Math.random() * 200 + 20, [`brand:${brand}`, `team:${b.team}`]);
-        dogstatsd.gauge('loyalty.member_points', points, [`brand:${brand}`, `team:${b.team}`]);
+        paySpan.setTag('payment.status', 'authorized');
+        dogstatsd.increment('payment.authorized', 1, [`brand:${brand}`, `method:${paymentMethod}`]);
       }
+      dogstatsd.histogram('payment.latency_ms', payLatency, [`brand:${brand}`, `method:${paymentMethod}`]);
+    });
+
+    // 3. Write order to DB (surfaces in DBM query patterns)
+    if (dbReady) {
+      await tracer.trace('db.insert_order', {
+        service:  `${CUSTOMER.servicePrefix}-${brand}-pos`,
+        resource: 'INSERT brand_metrics',
+        type:     'sql',
+      }, async (dbSpan) => {
+        dbSpan.setTag('db.type',     'postgresql');
+        dbSpan.setTag('db.instance', process.env.PGDATABASE || 'inspire_brands');
+        dbSpan.setTag('brand', brand);
+        await dbQuery(
+          'INSERT INTO brand_metrics (brand, orders, revenue, errors) VALUES ($1, 1, $2, 0)',
+          [brand, order.total]
+        );
+      });
+      // Keep delta flush in sync so it doesn't double-count
+      _lastFlushed[brand].totalOrders++;
+      _lastFlushed[brand].totalRevenue += order.total;
     }
-  }
+
+    brandOrders[brand].push(order);
+    brandMetrics[brand].totalOrders++;
+    brandMetrics[brand].totalRevenue += order.total;
+
+    dogstatsd.increment('orders.created',      1,           [`brand:${brand}`, `team:${b.team}`, `channel:${channel}`, 'source:background']);
+    dogstatsd.increment('orders.revenue',      order.total, [`brand:${brand}`, `team:${b.team}`]);
+    dogstatsd.histogram('orders.value',        order.total, [`brand:${brand}`, `team:${b.team}`]);
+    dogstatsd.histogram('pos.processing_time', delayMs,     [`brand:${brand}`, `team:${b.team}`, `slow_pos:${slow}`]);
+
+    // 4. Loyalty lookup (~40% of orders)
+    if (Math.random() < 0.4 && !FLAGS[`${brand}-chaos`]?.enabled) {
+      const degraded = FLAGS['loyalty-degraded']?.enabled;
+      brandMetrics[brand].loyaltyLookups++;
+      await tracer.trace('loyalty.member_lookup', {
+        service:  `${CUSTOMER.servicePrefix}-${brand}-loyalty`,
+        resource: `GET loyalty/${brand}/member`,
+        type:     'http',
+      }, async (loySpan) => {
+        loySpan.setTag('brand',    brand);
+        loySpan.setTag('team',     b.team);
+        loySpan.setTag('degraded', degraded);
+        if (degraded && Math.random() < 0.4) {
+          loySpan.setTag('error', true);
+          dogstatsd.increment('loyalty.errors', 1, [`brand:${brand}`, `team:${b.team}`, 'source:background']);
+        } else {
+          const points  = Math.floor(Math.random() * 5000) + 100;
+          const latency = degraded ? Math.random() * 2000 + 400 : Math.random() * 200 + 20;
+          await new Promise(r => setTimeout(r, latency));
+          loySpan.setTag('loyalty.points', points);
+          dogstatsd.histogram('loyalty.lookup_latency', latency, [`brand:${brand}`, `team:${b.team}`]);
+          dogstatsd.gauge('loyalty.member_points',       points,  [`brand:${brand}`, `team:${b.team}`]);
+        }
+      });
+    }
+  });
 }
 
 function scheduleBackgroundTraffic() {
