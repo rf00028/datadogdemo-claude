@@ -1250,27 +1250,56 @@ app.get('/api/dbm/stats', async (req, res) => {
 });
 
 // ── SLO status (KPI source) ───────────────────────────────
+// Cache results for 60s — each refresh fans out N parallel history calls
+let _sloCache = null;
+let _sloCacheAt = 0;
+
 app.get('/api/datadog/slos', async (req, res) => {
   const apiKey = process.env.DD_API_KEY;
   const appKey = process.env.DD_APP_KEY;
   const site   = process.env.DD_SITE || 'datadoghq.com';
   if (!apiKey || !appKey) return res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0 });
 
+  if (_sloCache && Date.now() - _sloCacheAt < 60_000) return res.json(_sloCache);
+
   try {
-    const r = await fetch(`https://api.${site}/api/v1/slo?tags=service%3A${CUSTOMER.platform}&limit=50`, {
-      headers: { 'DD-API-KEY': apiKey, 'DD-APPLICATION-KEY': appKey },
-    });
-    if (!r.ok) return res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0 });
-    const data = await r.json();
-    const slos = (data.data || []).map(s => ({
-      id:     s.id,
-      name:   s.name,
-      status: s.overall_status || 'No Data',
+    const hdrs = { 'DD-API-KEY': apiKey, 'DD-APPLICATION-KEY': appKey };
+
+    // Fetch all SLOs — tag filter param doesn't work server-side, filter client-side
+    const listResp = await fetch(`https://api.${site}/api/v1/slo?limit=250`, { headers: hdrs });
+    if (!listResp.ok) return res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0 });
+    const listData  = await listResp.json();
+    const inspireSlos = (listData.data || []).filter(s =>
+      (s.tags || []).includes(`service:${CUSTOMER.platform}`)
+    );
+    if (!inspireSlos.length) return res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0 });
+
+    // Fan out parallel history calls to get actual state per SLO
+    const now  = Math.floor(Date.now() / 1000);
+    const from = now - 7 * 86400;
+    const slos = await Promise.all(inspireSlos.map(async (s) => {
+      try {
+        const r = await fetch(
+          `https://api.${site}/api/v1/slo/${s.id}/history?from_ts=${from}&to_ts=${now}`,
+          { headers: hdrs }
+        );
+        if (!r.ok) return { id: s.id, name: s.name, status: 'No Data' };
+        const h     = await r.json();
+        const state = h.data?.overall?.state || 'no_data';
+        return {
+          id:     s.id,
+          name:   s.name,
+          status: state === 'ok' ? 'OK' : state === 'breached' ? 'Breached' : state === 'warning' ? 'Warning' : 'No Data',
+        };
+      } catch { return { id: s.id, name: s.name, status: 'No Data' }; }
     }));
+
     const ok      = slos.filter(s => s.status === 'OK').length;
-    const breached= slos.filter(s => ['BREACHED','Breached','Error'].includes(s.status)).length;
-    const warn    = slos.filter(s => ['WARNING','Warn','Warning'].includes(s.status)).length;
-    res.json({ slos, total: slos.length, ok, breached, warn });
+    const breached = slos.filter(s => s.status === 'Breached').length;
+    const warn    = slos.filter(s => s.status === 'Warning').length;
+    _sloCache   = { slos, total: slos.length, ok, breached, warn };
+    _sloCacheAt = Date.now();
+    res.json(_sloCache);
   } catch (e) {
     res.json({ slos: [], total: 0, ok: 0, breached: 0, warn: 0, error: e.message });
   }
