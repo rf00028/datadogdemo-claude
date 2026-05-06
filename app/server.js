@@ -668,6 +668,20 @@ app.post('/api/flags/:name/toggle', (req, res) => {
   res.json({ name, enabled: newValue, description: flag.description });
 });
 
+// ── Reset all flags atomically ────────────────────────────
+app.post('/api/flags/reset', (req, res) => {
+  for (const name of Object.keys(FLAGS)) {
+    FLAGS[name].enabled = false;
+    dbQuery(
+      'INSERT INTO feature_flags (key,enabled,updated_at) VALUES ($1,false,NOW()) ON CONFLICT (key) DO UPDATE SET enabled=false,updated_at=NOW()',
+      [name]
+    );
+  }
+  logger.info('platform.all_clear', { message: 'All incident flags reset to disabled' });
+  dogstatsd.increment('feature_flag.all_clear', 1);
+  res.json({ ok: true, cleared: Object.keys(FLAGS).length });
+});
+
 // ── Monitor status proxy (all monitors tagged to this service) ───────────────
 app.get('/api/monitors', async (req, res) => {
   const apiKey = process.env.DD_API_KEY;

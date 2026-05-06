@@ -1040,10 +1040,7 @@
   }
 
   async function allClear() {
-    const allFlags = await fetch('/api/flags').then(r => r.json());
-    for (const f of allFlags.flags) {
-      if (f.enabled) await toggleFlag(f.name, null);
-    }
+    await fetch('/api/flags/reset', { method: 'POST' });
     addLog('log-ok', null, 'SCENARIO', 'all-clear', '200', 'All incidents cleared — platform restored to healthy state');
     loadBrands();
     loadFlags();
