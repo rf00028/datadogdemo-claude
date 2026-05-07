@@ -39,19 +39,23 @@ echo -e "${GREEN}✓ Site: ${DD_SITE:-datadoghq.com}${NC}"
 echo -e "${GREEN}✓ Env:  ${DD_ENV:-local}${NC}"
 echo ""
 
-# ── Docker Compose ────────────────────────────────────────────────────────────
-echo "🐳 Building and starting containers..."
-docker compose up --build -d
+# ── Datadog Agent check ───────────────────────────────────────────────────────
+DD_AGENT_HOST="${DD_AGENT_HOST:-localhost}"
+DD_TRACE_AGENT_PORT="${DD_TRACE_AGENT_PORT:-8126}"
+if curl -sf "http://${DD_AGENT_HOST}:${DD_TRACE_AGENT_PORT}/info" >/dev/null 2>&1; then
+  echo -e "${GREEN}✓ Datadog Agent reachable at ${DD_AGENT_HOST}:${DD_TRACE_AGENT_PORT}${NC}"
+else
+  echo -e "${YELLOW}⚠  Datadog Agent not found at ${DD_AGENT_HOST}:${DD_TRACE_AGENT_PORT} — traces won't ship${NC}"
+fi
+echo ""
 
-echo ""
-echo -e "${GREEN}✓ Stack is up!${NC}"
-echo ""
-echo "  🌐 App frontend:     http://localhost:3000"
-echo "  ❤️  Health check:     http://localhost:3000/health"
-echo "  📊 Datadog APM:      https://app.datadoghq.com/apm/services"
-echo "  📝 Datadog Logs:     https://app.datadoghq.com/logs"
-echo "  📈 Metrics explorer: https://app.datadoghq.com/metric/explorer"
-echo ""
-echo "  Logs: docker compose logs -f app"
-echo "  Stop: docker compose down"
-echo ""
+# ── Install deps if needed ────────────────────────────────────────────────────
+if [ ! -d app/node_modules ]; then
+  echo "📦 Installing dependencies..."
+  (cd app && npm install --silent)
+fi
+
+# ── Start Node directly ───────────────────────────────────────────────────────
+echo "🚀 Starting server..."
+cd app
+exec node server.js
