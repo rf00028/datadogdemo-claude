@@ -55,6 +55,13 @@ if [ ! -d app/node_modules ]; then
   (cd app && npm install --silent)
 fi
 
+# ── Remind about optional one-time setup scripts ─────────────────────────────
+echo "  Optional one-time setup scripts (run from repo root in a new terminal):"
+echo "    node setup-incidents.js   # Incident Management + Workflow Automation"
+echo "    node setup-sds.js         # Sensitive Data Scanner rules (PCI/PII)"
+echo "    node setup-cost.js        # Cost Attribution dashboard"
+echo ""
+
 # ── Start Node directly ───────────────────────────────────────────────────────
 echo "🚀 Starting server..."
 cd app

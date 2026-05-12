@@ -1173,6 +1173,129 @@ app.get('/api/security/file', (req, res) => {
   res.json({ file: filePath, content, timestamp: new Date().toISOString() });
 });
 
+// ── Error Tracking demo ───────────────────────────────────
+// Generates realistic backend errors that surface in Datadog Error Tracking
+// grouped by type/fingerprint, with full stack traces and span context.
+const ERROR_SCENARIOS = [
+  {
+    type:    'PaymentGatewayTimeoutError',
+    message: 'Payment gateway did not respond within 30000ms',
+    stack:   'PaymentGatewayTimeoutError: Payment gateway did not respond within 30000ms\n    at PaymentClient.charge (/app/services/payment.js:142:13)\n    at processOrder (/app/services/pos.js:89:22)',
+    tags:    { 'error.type': 'PaymentGatewayTimeoutError', component: 'payment-gateway', http_status: 504 },
+  },
+  {
+    type:    'LoyaltyServiceConnectionError',
+    message: 'ECONNREFUSED connecting to loyalty-api:8443',
+    stack:   'LoyaltyServiceConnectionError: ECONNREFUSED connecting to loyalty-api:8443\n    at LoyaltyClient.lookup (/app/services/loyalty.js:77:9)\n    at enrichOrder (/app/services/pos.js:201:18)',
+    tags:    { 'error.type': 'LoyaltyServiceConnectionError', component: 'loyalty-service', http_status: 503 },
+  },
+  {
+    type:    'MenuSyncStaleDataError',
+    message: "Cannot read properties of undefined (reading 'price') — menu cache is stale",
+    stack:   "MenuSyncStaleDataError: Cannot read properties of undefined (reading 'price')\n    at buildOrderTotal (/app/services/menu.js:55:38)\n    at POST /api/:brand/orders (/app/server.js:312:14)",
+    tags:    { 'error.type': 'MenuSyncStaleDataError', component: 'menu-cache', http_status: 500 },
+  },
+  {
+    type:    'InventoryReservationConflict',
+    message: 'Optimistic lock conflict: inventory row modified by concurrent request',
+    stack:   'InventoryReservationConflict: Optimistic lock conflict\n    at InventoryClient.reserve (/app/services/inventory.js:188:11)\n    at processOrder (/app/services/pos.js:134:30)',
+    tags:    { 'error.type': 'InventoryReservationConflict', component: 'inventory-service', http_status: 409 },
+  },
+];
+
+app.post('/api/error-demo/:brand', async (req, res) => {
+  const { brand } = req.params;
+  const b = BRANDS[brand];
+  if (!b) return res.status(404).json({ error: 'Unknown brand' });
+
+  const scenario = ERROR_SCENARIOS[Math.floor(Math.random() * ERROR_SCENARIOS.length)];
+  const err = new Error(scenario.message);
+  err.name  = scenario.type;
+  err.stack = scenario.stack;
+
+  return tracer.trace('pos.create_order', {
+    service:  `${CUSTOMER.servicePrefix}-${brand}-pos`,
+    resource: `POST /api/${brand}/orders`,
+    type:     'web',
+  }, async (span) => {
+    span.setTag('brand', brand);
+    span.setTag('team',  b.team);
+    span.setTag('error', true);
+    Object.entries(scenario.tags).forEach(([k, v]) => span.setTag(k, v));
+    span.setTag('error.msg',   err.message);
+    span.setTag('error.stack', err.stack);
+    span.setTag('error.type',  err.name);
+
+    logger.error('pos.order_failed', {
+      brand, team: b.team,
+      error:      err.message,
+      error_type: err.name,
+      component:  scenario.tags.component,
+    });
+    dogstatsd.increment('pos.errors', 1, [
+      `brand:${brand}`, `team:${b.team}`,
+      `error_type:${scenario.type.toLowerCase()}`,
+      'source:error_demo',
+    ]);
+
+    await new Promise(r => setTimeout(r, 120));
+    res.status(500).json({
+      error:      err.message,
+      error_type: err.name,
+      brand,
+      component:  scenario.tags.component,
+      dd_trace:   'https://app.datadoghq.com/apm/traces',
+      dd_errors:  'https://app.datadoghq.com/error-tracking',
+    });
+  });
+});
+
+// ── Sensitive Data Scanner demo ───────────────────────────
+// Emits structured log events containing realistic fake PII so SDS scanning
+// rules can detect and redact credit cards, SSNs, and emails in the log pipeline.
+const FAKE_PII_SCENARIOS = [
+  {
+    event:       'payment.processed',
+    customer_id: 'cust_8821947302',
+    card_number: '4532-0152-8347-1903',   // fake Visa, fails Luhn
+    card_last4:  '1903',
+    name:        'Jennifer Caldwell',
+    email:       'jcaldwell@example-inspire.com',
+    ssn_hint:    '***-**-4721',
+    amount:      24.99,
+    brand:       null,
+  },
+  {
+    event:       'loyalty.enrollment',
+    customer_id: 'cust_4409183726',
+    card_number: '5425-2334-3010-9903',   // fake MC, fails Luhn
+    card_last4:  '9903',
+    name:        'Marcus Thompson',
+    email:       'mthompson@gmail-example.com',
+    ssn:         '123-45-6789',            // obviously fake SSN
+    amount:      0,
+    brand:       null,
+  },
+];
+
+app.post('/api/sds-demo', (req, res) => {
+  const { brand = 'arbys' } = req.body;
+  const b    = BRANDS[brand] || BRANDS['arbys'];
+  const pii  = FAKE_PII_SCENARIOS[Math.floor(Math.random() * FAKE_PII_SCENARIOS.length)];
+  const payload = { ...pii, brand, team: b.team, timestamp: new Date().toISOString() };
+
+  logger.warn('customer.payment_record', payload);
+  dogstatsd.increment('sds.demo_events', 1, [`brand:${brand}`, 'event_type:pii_exposure_demo']);
+
+  res.json({
+    ok:      true,
+    message: 'PII log event emitted — check Sensitive Data Scanner in Datadog',
+    event:   pii.event,
+    dd_sds:  'https://app.datadoghq.com/organization-settings/sensitive-data-scanner',
+    dd_logs: `https://app.datadoghq.com/logs?query=service:${CUSTOMER.platform}+%40brand:${brand}`,
+  });
+});
+
 // ── Deployment event + 60s burst ─────────────────────────
 let deployBurstUntil = 0;
 

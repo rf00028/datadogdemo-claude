@@ -572,6 +572,10 @@
     <a class="dd-link" id="lnkTeams"   href="https://app.datadoghq.com/organization-settings/teams" target="_blank">🏢 Teams</a>
     <a class="dd-link green" id="lnkLlm" href="https://app.datadoghq.com/llm/traces" target="_blank">✦ LLM Observability</a>
     <a class="dd-link" id="lnkAsm" href="https://app.datadoghq.com/security/appsec" target="_blank">🛡 App Security</a>
+    <a class="dd-link" id="lnkErrors" href="https://app.datadoghq.com/error-tracking" target="_blank">🐛 Error Tracking</a>
+    <a class="dd-link" id="lnkIncidents" href="https://app.datadoghq.com/incidents" target="_blank">🚨 Incidents</a>
+    <a class="dd-link" id="lnkSds" href="https://app.datadoghq.com/organization-settings/sensitive-data-scanner" target="_blank">🔐 Sensitive Data</a>
+    <a class="dd-link" id="lnkCost" href="https://app.datadoghq.com/cost/summary" target="_blank">💰 Cost</a>
   </div>
 
   <!-- ── Platform KPIs ── -->
@@ -677,6 +681,26 @@
       <p>Send a deployment event marker to Datadog + 60s latency burst across all services. Shows on APM dashboards and timelines.</p>
       <button class="btn-purple" onclick="deployVersion()">Deploy v2.0</button>
       <div id="deployResult" style="font-size:0.72rem;margin-top:8px;color:var(--subtle);min-height:16px;"></div>
+    </div>
+
+    <div class="scenario-card" style="border-color:#ef444444;">
+      <h3>🐛 Error Tracking</h3>
+      <p>Inject a realistic backend error (payment timeout, loyalty ECONNREFUSED, stale menu cache). Surfaces in Error Tracking grouped by type.</p>
+      <select id="error-brand-select" style="width:100%;margin-bottom:8px;">
+        <option value="">Select brand…</option>
+      </select>
+      <button class="btn-scenario-red" onclick="injectError()">Inject Backend Error</button>
+      <div id="errorResult" style="font-size:0.72rem;margin-top:8px;color:var(--subtle);min-height:16px;"></div>
+    </div>
+
+    <div class="scenario-card" style="border-color:#a855f744;">
+      <h3>🔐 Sensitive Data Scanner</h3>
+      <p>Emit a log event containing fake PII (credit card, SSN, email). SDS scanning rules detect and redact it in the log pipeline.</p>
+      <select id="sds-brand-select" style="width:100%;margin-bottom:8px;">
+        <option value="">Select brand…</option>
+      </select>
+      <button class="btn-scenario-blue" onclick="triggerSdsDemo()">Emit PII Log Event</button>
+      <div id="sdsResult" style="font-size:0.72rem;margin-top:8px;color:var(--subtle);min-height:16px;"></div>
     </div>
 
   </div>
@@ -1268,13 +1292,56 @@
 
   // ── Populate selects ─────────────────────────────────────
   function populateBrandSelects(brands) {
-    ['outage-brand-select', 'slow-brand-select', 'floodBrand'].forEach(id => {
+    ['outage-brand-select', 'slow-brand-select', 'error-brand-select', 'sds-brand-select', 'floodBrand'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       const current = el.value;
       const prefix  = id === 'floodBrand' ? '<option value="">All brands</option>' : '<option value="">Select brand…</option>';
       el.innerHTML  = prefix + brands.map(b => `<option value="${b.key}" ${b.key === current ? 'selected' : ''}>${b.name}</option>`).join('');
     });
+  }
+
+  // ── Error Tracking demo ───────────────────────────────────
+  async function injectError() {
+    const brand  = document.getElementById('error-brand-select').value;
+    const result = document.getElementById('errorResult');
+    if (!brand) { alert('Please select a brand.'); return; }
+    result.style.color = 'var(--subtle)';
+    result.textContent = 'Injecting error…';
+    try {
+      const res  = await fetch(`/api/error-demo/${brand}`, { method: 'POST' });
+      const data = await res.json();
+      result.style.color = 'var(--red)';
+      result.textContent = `✓ ${data.error_type} injected — check Error Tracking`;
+      addLog('log-error', brand, 'ERROR', `/api/error-demo/${brand}`, 500, data.error_type + ': ' + data.error);
+      window.DD_RUM?.addAction('error_tracking_demo', { brand, error_type: data.error_type });
+    } catch (e) {
+      result.style.color = 'var(--red)';
+      result.textContent = `Error: ${e.message}`;
+    }
+  }
+
+  // ── Sensitive Data Scanner demo ───────────────────────────
+  async function triggerSdsDemo() {
+    const brand  = document.getElementById('sds-brand-select').value || 'arbys';
+    const result = document.getElementById('sdsResult');
+    result.style.color = 'var(--subtle)';
+    result.textContent = 'Emitting PII log event…';
+    try {
+      const res  = await fetch('/api/sds-demo', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ brand }),
+      });
+      const data = await res.json();
+      result.style.color = '#a855f7';
+      result.textContent = `✓ PII event emitted (${data.event}) — check Sensitive Data Scanner`;
+      addLog('log-warn', brand, 'WARN', '/api/sds-demo', 200, `PII log event emitted: ${data.event}`);
+      window.DD_RUM?.addAction('sds_demo', { brand, event: data.event });
+    } catch (e) {
+      result.style.color = 'var(--red)';
+      result.textContent = `Error: ${e.message}`;
+    }
   }
 
   // ── Security attack simulations (ASM demo) ───────────────
@@ -1349,7 +1416,11 @@
         document.getElementById('lnkSynth').href   = ddAssets.urls.synthetics|| document.getElementById('lnkSynth').href;
         document.getElementById('lnkLogs').href    = ddAssets.urls.logs      || document.getElementById('lnkLogs').href;
         document.getElementById('lnkTeams').href   = ddAssets.urls.teams     || document.getElementById('lnkTeams').href;
-        document.getElementById('lnkLlm').href     = ddAssets.urls.llmObs    || document.getElementById('lnkLlm').href;
+        document.getElementById('lnkLlm').href      = ddAssets.urls.llmObs           || document.getElementById('lnkLlm').href;
+        document.getElementById('lnkErrors').href   = ddAssets.urls.errorTracking     || document.getElementById('lnkErrors').href;
+        document.getElementById('lnkIncidents').href= ddAssets.urls.incidentsList     || document.getElementById('lnkIncidents').href;
+        document.getElementById('lnkSds').href      = ddAssets.urls.sensitiveDataScanner || document.getElementById('lnkSds').href;
+        document.getElementById('lnkCost').href     = ddAssets.urls.costDashboard     || ddAssets.urls.costManagement || document.getElementById('lnkCost').href;
       }
     } catch (e) { /* dd-assets.json not yet generated — links use defaults */ }
   }

@@ -154,6 +154,7 @@ async function initRUM() {
       DD_RUM.setGlobalContextProperty('brand', 'global');
       DD_RUM.setGlobalContextProperty('brand.name', 'Inspire Brands Portal');
       DD_RUM.setGlobalContextProperty('team', 'inspire-platform');
+      DD_RUM.startSessionReplayRecording();
       DD_RUM.startView({ name: 'inspire-portal' });
     }
 
