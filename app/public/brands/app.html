@@ -177,7 +177,7 @@
       cursor: pointer; transition: .18s; border: 1.5px solid transparent;
     }
     .featured-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--brand-light); }
-    .featured-img { height: 110px; display: flex; align-items: center; justify-content: center; font-size: 50px; position: relative; }
+    .featured-img { height: 110px; display: flex; align-items: center; justify-content: center; font-size: 50px; position: relative; overflow: hidden; }
     .featured-body { padding: 10px 12px 12px; }
     .featured-name { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.3; }
     .featured-price { font-size: 14px; font-weight: 800; color: var(--brand); margin-top: 4px; }
@@ -201,9 +201,10 @@
     .menu-card:active { transform: scale(.97); }
     .card-img {
       height: 120px; display: flex; align-items: center; justify-content: center;
-      font-size: 46px; position: relative; flex-shrink: 0;
+      font-size: 46px; position: relative; flex-shrink: 0; overflow: hidden;
     }
-    .card-img-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.08)); }
+    .item-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .card-img-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.08)); pointer-events: none; }
     .card-body { padding: 11px 12px 12px; flex: 1; display: flex; flex-direction: column; }
     .card-category { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 3px; }
     .card-name { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.35; flex: 1; }
@@ -925,11 +926,15 @@ function renderMenuGrid() {
     const rating   = FAKE_RATINGS[item.category] || 4.5;
     const cals     = FAKE_CALS[item.category] || '400 cal';
     const badge    = idx === 0 ? '<div class="popular-badge">Popular</div>' : (idx === filtered.length-1 ? '<div class="new-badge">New</div>' : '');
+    const photoEl  = item.image
+      ? `<img src="${item.image}" alt="${item.name}" class="item-photo" onerror="this.style.display='none';this.nextElementSibling.style.removeProperty('display')">`
+        + `<span style="display:none;font-size:46px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))">${emoji}</span>`
+      : `<span style="font-size:46px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))">${emoji}</span>`;
     return `
       <div class="menu-card" onclick="addToCart(${JSON.stringify(item).replace(/"/g,'&quot;')})">
         <div class="card-img" style="background:linear-gradient(145deg,${c1},${c2})">
           ${badge}
-          <span style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))">${emoji}</span>
+          ${photoEl}
           <div class="card-img-overlay"></div>
         </div>
         <div class="card-body">
@@ -956,11 +961,15 @@ function renderFeatured(items) {
   wrap.innerHTML = featured.map((item, i) => {
     const [c1, c2] = CATEGORY_COLORS[item.category] || CATEGORY_COLORS.default;
     const emoji    = CATEGORY_EMOJIS[item.category] || CATEGORY_EMOJIS.default;
+    const photoEl  = item.image
+      ? `<img src="${item.image}" alt="${item.name}" class="item-photo" onerror="this.style.display='none';this.nextElementSibling.style.removeProperty('display')">`
+        + `<span style="display:none;font-size:50px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))">${emoji}</span>`
+      : `<span style="font-size:50px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))">${emoji}</span>`;
     return `
       <div class="featured-card" onclick="addToCart(${JSON.stringify(item).replace(/"/g,'&quot;')})">
         <div class="featured-img" style="background:linear-gradient(145deg,${c1},${c2})">
           ${i === 0 ? '<div class="popular-badge">Popular</div>' : ''}
-          <span style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))">${emoji}</span>
+          ${photoEl}
           <button class="featured-add" onclick="event.stopPropagation();addToCart(${JSON.stringify(item).replace(/"/g,'&quot;')})" aria-label="Add">+</button>
         </div>
         <div class="featured-body">
