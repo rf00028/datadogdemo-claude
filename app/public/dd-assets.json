@@ -3,17 +3,16 @@
   "service": "inspire-brands-platform",
   "env": "local",
   "dashboards": {
-    "platform": "3t7-6rx-4xc",
-    "arbys": "f75-z6m-tar",
-    "bww": "q5d-bjs-bse",
-    "sonic": "nxt-4cb-fca",
-    "dunkin": "yd2-vab-79j",
-    "baskin-robbins": "mu7-y5j-aw3",
-    "jimmy-johns": "tap-3s5-x26",
-    "global": "2t6-2kz-we3"
+    "platform": "5mn-ptx-6fu",
+    "arbys": "iae-diq-pzz",
+    "bww": "8ws-kyd-kge",
+    "sonic": "hxk-j3b-qhf",
+    "dunkin": "xzi-7dg-mrf",
+    "baskin-robbins": "n5m-3jm-rwh",
+    "jimmy-johns": "pb8-yj6-z6q"
   },
   "urls": {
-    "execDashboard": "https://app.datadoghq.com/dashboard/3t7-6rx-4xc",
+    "execDashboard": "https://app.datadoghq.com/dashboard/5mn-ptx-6fu",
     "apm": "https://app.datadoghq.com/apm/services?env=local&search=inspire",
     "apmMap": "https://app.datadoghq.com/apm/map?env=local",
     "monitors": "https://app.datadoghq.com/monitors/manage?q=service%3Ainspire-brands-platform",
@@ -21,176 +20,44 @@
     "synthetics": "https://app.datadoghq.com/synthetics/list?query=service%3Ainspire-brands-platform",
     "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform",
     "teams": "https://app.datadoghq.com/organization-settings/teams",
-    "llmObs": "https://app.datadoghq.com/llm/traces",
-    "globalDashboard": "https://app.datadoghq.com/dashboard/2t6-2kz-we3",
-    "slos": "https://app.datadoghq.com/slos",
-    "costManagement": "https://app.datadoghq.com/cost/summary",
-    "usageSummary": "https://app.datadoghq.com/account/usage"
+    "llmObs": "https://app.datadoghq.com/llm/traces"
   },
   "brandLinks": {
     "arbys": {
-      "dashboard": "https://app.datadoghq.com/dashboard/f75-z6m-tar",
+      "dashboard": "https://app.datadoghq.com/dashboard/iae-diq-pzz",
       "apm": "https://app.datadoghq.com/apm/services/inspire-arbys-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Aarbys-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Aarbys",
-      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3Ad7a111b2-f826-48d8-92bb-33fcce3285ae"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+brand%3Aarbys"
     },
     "bww": {
-      "dashboard": "https://app.datadoghq.com/dashboard/q5d-bjs-bse",
+      "dashboard": "https://app.datadoghq.com/dashboard/8ws-kyd-kge",
       "apm": "https://app.datadoghq.com/apm/services/inspire-bww-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Abww-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Abww",
-      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A66aabdd7-0f55-4661-86bc-8c2d9dae596b"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+brand%3Abww"
     },
     "sonic": {
-      "dashboard": "https://app.datadoghq.com/dashboard/nxt-4cb-fca",
+      "dashboard": "https://app.datadoghq.com/dashboard/hxk-j3b-qhf",
       "apm": "https://app.datadoghq.com/apm/services/inspire-sonic-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Asonic-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Asonic",
-      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A4b20f6fe-a3a3-4589-a687-740922ed05bd"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+brand%3Asonic"
     },
     "dunkin": {
-      "dashboard": "https://app.datadoghq.com/dashboard/yd2-vab-79j",
+      "dashboard": "https://app.datadoghq.com/dashboard/xzi-7dg-mrf",
       "apm": "https://app.datadoghq.com/apm/services/inspire-dunkin-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Adunkin-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Adunkin",
-      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A4ed78b23-f9db-4187-837d-57202dd79590"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+brand%3Adunkin"
     },
     "baskin-robbins": {
-      "dashboard": "https://app.datadoghq.com/dashboard/mu7-y5j-aw3",
+      "dashboard": "https://app.datadoghq.com/dashboard/n5m-3jm-rwh",
       "apm": "https://app.datadoghq.com/apm/services/inspire-baskin-robbins-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Abr-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Abaskin-robbins",
-      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3A671bd65c-031c-49fd-82fd-658a7259dc29"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+brand%3Abaskin-robbins"
     },
     "jimmy-johns": {
-      "dashboard": "https://app.datadoghq.com/dashboard/tap-3s5-x26",
+      "dashboard": "https://app.datadoghq.com/dashboard/pb8-yj6-z6q",
       "apm": "https://app.datadoghq.com/apm/services/inspire-jimmy-johns-pos?env=local",
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Ajj-ops",
-      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+%40brand%3Ajimmy-johns",
-      "rum": "https://app.datadoghq.com/rum/sessions?query=%40application.id%3Aea27a8c2-c632-43dc-9e51-ec2faef0caa8"
+      "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+brand%3Ajimmy-johns"
     }
-  },
-  "slos": [
-    {
-      "brand": "arbys",
-      "type": "availability"
-    },
-    {
-      "brand": "arbys",
-      "type": "latency"
-    },
-    {
-      "brand": "bww",
-      "type": "availability"
-    },
-    {
-      "brand": "bww",
-      "type": "latency"
-    },
-    {
-      "brand": "sonic",
-      "type": "availability"
-    },
-    {
-      "brand": "sonic",
-      "type": "latency"
-    },
-    {
-      "brand": "dunkin",
-      "type": "availability"
-    },
-    {
-      "brand": "dunkin",
-      "type": "latency"
-    },
-    {
-      "brand": "baskin-robbins",
-      "type": "availability"
-    },
-    {
-      "brand": "baskin-robbins",
-      "type": "latency"
-    },
-    {
-      "brand": "jimmy-johns",
-      "type": "availability"
-    },
-    {
-      "brand": "jimmy-johns",
-      "type": "latency"
-    },
-    {
-      "brand": "platform",
-      "type": "availability"
-    },
-    {
-      "brand": "platform",
-      "type": "loyalty"
-    },
-    {
-      "brand": "platform",
-      "type": "delivery"
-    }
-  ],
-  "rum": {
-    "arbys": {
-      "applicationId": "d7a111b2-f826-48d8-92bb-33fcce3285ae",
-      "clientToken": "pub701d8dd8ad2185163f396cfdb71f7f6f",
-      "name": "Inspire Arby's Web",
-      "service": "inspire-arbys-web"
-    },
-    "bww": {
-      "applicationId": "66aabdd7-0f55-4661-86bc-8c2d9dae596b",
-      "clientToken": "pub678f9b2d6206277a1ddb92ec11d2162d",
-      "name": "Inspire Buffalo Wild Wings Web",
-      "service": "inspire-bww-web"
-    },
-    "sonic": {
-      "applicationId": "4b20f6fe-a3a3-4589-a687-740922ed05bd",
-      "clientToken": "pub3a39a3a756e9f72fd04d787d1eb54876",
-      "name": "Inspire Sonic Drive-In Web",
-      "service": "inspire-sonic-web"
-    },
-    "dunkin": {
-      "applicationId": "4ed78b23-f9db-4187-837d-57202dd79590",
-      "clientToken": "pubc1ce95acb74777050ef8dac4b62d6f3c",
-      "name": "Inspire Dunkin' Web",
-      "service": "inspire-dunkin-web"
-    },
-    "baskin-robbins": {
-      "applicationId": "671bd65c-031c-49fd-82fd-658a7259dc29",
-      "clientToken": "pubc0e5cc4572b0aa6463c9cf3175bdc788",
-      "name": "Inspire Baskin-Robbins Web",
-      "service": "inspire-baskin-robbins-web"
-    },
-    "jimmy-johns": {
-      "applicationId": "ea27a8c2-c632-43dc-9e51-ec2faef0caa8",
-      "clientToken": "pub0507cab73707ef70102ea638fbc8794e",
-      "name": "Inspire Jimmy John's Web",
-      "service": "inspire-jimmy-johns-web"
-    },
-    "global": {
-      "applicationId": "9486f1c7-8944-4d3a-afc8-80b6300e9369",
-      "clientToken": "pub9bd737b8b85b65ee929fa58f32679e69",
-      "name": "Inspire Brands Global Portal",
-      "service": "inspire-global-web"
-    }
-  },
-  "synthRum": {
-    "arbys": "p3r-6bq-8k8",
-    "bww": "pgj-zsx-fcd",
-    "sonic": "88c-fwy-kzv",
-    "dunkin": "dme-68j-tnp",
-    "baskin-robbins": "38v-4aq-nyx"
-  },
-  "brandLogoUrls": {
-    "arbys": "https://inspirebrands.com/wp-content/uploads/2017/10/Arbys.jpg",
-    "bww": "https://inspirebrands.com/wp-content/uploads/2018/08/Buffalo-Wild-Wings-Logo-Horizontal.jpg",
-    "sonic": "https://inspirebrands.com/wp-content/uploads/2020/02/Sonic_Logo-1-scaled.jpg",
-    "dunkin": "https://inspirebrands.com/wp-content/uploads/2023/10/Dunkin_Icon_2color_RGB-2.png",
-    "baskin-robbins": "https://inspirebrands.com/wp-content/uploads/2022/04/IB_BROnlineStamp-01.png",
-    "jimmy-johns": "https://inspirebrands.com/wp-content/uploads/2023/10/JJ-Red-2.png"
-  },
-  "privateLocationId": "pl:inspire-brands-local-demo-a64e4f3b9974a98784e313831814ea9f"
+  }
 }
