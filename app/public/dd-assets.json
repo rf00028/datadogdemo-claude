@@ -20,7 +20,8 @@
     "synthetics": "https://app.datadoghq.com/synthetics/list?query=service%3Ainspire-brands-platform",
     "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform",
     "teams": "https://app.datadoghq.com/organization-settings/teams",
-    "llmObs": "https://app.datadoghq.com/llm/traces"
+    "llmObs": "https://app.datadoghq.com/llm/traces",
+    "scorecards": "https://app.datadoghq.com/catalog/scorecard"
   },
   "brandLinks": {
     "arbys": {
