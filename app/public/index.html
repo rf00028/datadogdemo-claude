@@ -541,14 +541,15 @@
     .monitor-chip.chip-Alert .chip-label { color: var(--red);    font-weight: 600; }
     .monitor-chip.chip-Warn  .chip-label { color: var(--yellow); font-weight: 600; }
 
-    .monitor-chip.chip-security {
-      border-color: rgba(251,113,133,0.5); background: rgba(251,113,133,0.08);
-      animation: sec-signal-border 1.5s infinite;
+    .monitor-chip.chip-security-ok .dot { background: var(--green); box-shadow: 0 0 4px var(--green); animation: pulse 2s infinite; }
+    .monitor-chip.chip-security-ok .chip-label { color: var(--text); }
+
+    .monitor-chip.chip-security-alert {
+      border-color: rgba(251,113,133,0.6); background: rgba(251,113,133,0.08);
+      animation: sec-signal-border 1.2s infinite;
     }
-    .monitor-chip.chip-security .dot {
-      background: #fb7185; box-shadow: 0 0 6px #fb7185; animation: pulse-red 0.8s infinite;
-    }
-    .monitor-chip.chip-security .chip-label { color: #fb7185; font-weight: 700; letter-spacing: 0.01em; }
+    .monitor-chip.chip-security-alert .dot { background: #fb7185; box-shadow: 0 0 6px #fb7185; animation: pulse-red 0.8s infinite; }
+    .monitor-chip.chip-security-alert .chip-label { color: #fb7185; font-weight: 700; }
     @keyframes sec-signal-border {
       0%, 100% { border-color: rgba(251,113,133,0.5); }
       50%       { border-color: rgba(251,113,133,1); }
@@ -1381,19 +1382,28 @@
   let _lastSignalIds = new Set();
 
   function renderSecurityChips(signals) {
-    // Clear existing chips from all rows
-    document.querySelectorAll('.chip-security').forEach(c => c.remove());
-    if (!signals.length) return;
+    const allKeys = [...(brandsData || []).map(b => b.key), '__platform__'];
 
-    // Group signals by brand team tag (fall back to platform row)
+    if (!signals.length) {
+      // Reset all chips to green/ok
+      allKeys.forEach(key => {
+        const chip = document.getElementById(`sec-chip-${key}`);
+        if (!chip) return;
+        chip.className = 'monitor-chip chip-security-ok';
+        chip.href      = 'https://app.datadoghq.com/security/appsec/signals';
+        chip.title     = 'No active security signals';
+        chip.innerHTML = `<span class="dot"></span><span class="chip-label">🛡 Security</span>`;
+      });
+      return;
+    }
+
+    // Group signals by brand team tag; untagged signals go to all rows
     const brandTeamMap = {};
     (brandsData || []).forEach(b => { brandTeamMap[b.team] = b.key; });
-
-    // Determine which brand rows get chips (signals tagged with a brand team → that row; otherwise platform)
-    const rowSignals = {}; // brandKey → [signal, ...]
+    const rowSignals = {};
     signals.forEach(sig => {
       let assigned = false;
-      sig.tags.forEach(tag => {
+      (sig.tags || []).forEach(tag => {
         const team = tag.startsWith('team:') ? tag.slice(5) : null;
         if (team && brandTeamMap[team]) {
           const bKey = brandTeamMap[team];
@@ -1403,32 +1413,30 @@
         }
       });
       if (!assigned) {
-        if (!rowSignals['__platform__']) rowSignals['__platform__'] = [];
-        rowSignals['__platform__'].push(sig);
+        // Platform-level signal — affects all brand rows
+        allKeys.forEach(k => {
+          if (!rowSignals[k]) rowSignals[k] = [];
+          rowSignals[k].push(sig);
+        });
       }
     });
 
-    // If no brand-specific signals, show on ALL rows (platform-wide attack)
-    const keys = Object.keys(rowSignals);
-    if (keys.length === 1 && keys[0] === '__platform__') {
-      const allKeys = [...(brandsData || []).map(b => b.key), '__platform__'];
-      allKeys.forEach(k => { rowSignals[k] = rowSignals['__platform__']; });
-    }
-
-    Object.entries(rowSignals).forEach(([key, sigs]) => {
-      const row = document.querySelector(`.monitor-brand-row[data-brand="${key}"]`);
-      if (!row) return;
-      const chipsEl = row.querySelector('.monitor-chips');
-      if (!chipsEl) return;
-      // Link to the most recent signal directly; fall back to filtered list
-      const topSig = sigs[0];
-      const chip = document.createElement('a');
-      chip.href      = topSig.url;
-      chip.target    = '_blank';
-      chip.className = 'monitor-chip chip-security';
-      chip.title     = `${sigs.length} signal${sigs.length !== 1 ? 's' : ''} detected: ${topSig.title}`;
-      chip.innerHTML = `<span class="dot"></span><span class="chip-label">🛡 ${sigs.length} Security Signal${sigs.length !== 1 ? 's' : ''}</span>`;
-      chipsEl.appendChild(chip);
+    allKeys.forEach(key => {
+      const chip = document.getElementById(`sec-chip-${key}`);
+      if (!chip) return;
+      const sigs = rowSignals[key];
+      if (sigs && sigs.length) {
+        const top = sigs[0];
+        chip.className = 'monitor-chip chip-security-alert';
+        chip.href      = top.url;
+        chip.title     = `${sigs.length} signal${sigs.length !== 1 ? 's' : ''}: ${top.title}`;
+        chip.innerHTML = `<span class="dot"></span><span class="chip-label">🛡 ${sigs.length} Signal${sigs.length !== 1 ? 's' : ''}</span>`;
+      } else {
+        chip.className = 'monitor-chip chip-security-ok';
+        chip.href      = 'https://app.datadoghq.com/security/appsec/signals';
+        chip.title     = 'No active security signals';
+        chip.innerHTML = `<span class="dot"></span><span class="chip-label">🛡 Security</span>`;
+      }
     });
   }
 
@@ -1704,11 +1712,16 @@
 
         return `<div class="monitor-brand-row" data-brand="${key}">
           <a href="${website}" target="_blank" class="monitor-brand-name" style="color:${color};text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${label}</a>
-          <div class="monitor-chips">${chips}</div>
+          <div class="monitor-chips">
+            ${chips}
+            <a id="sec-chip-${key}" href="https://app.datadoghq.com/security/appsec/signals" target="_blank" class="monitor-chip chip-security-ok" title="No active security signals">
+              <span class="dot"></span><span class="chip-label">🛡 Security</span>
+            </a>
+          </div>
         </div>`;
       }).join('');
-      // Re-render security chips after monitor rows rebuild
-      renderSecurityChips([..._lastSignalIds].length ? await fetch('/api/security/signals').then(r=>r.json()).then(d=>d.signals||[]).catch(()=>[]) : []);
+      // Re-apply security chip states after monitor rows rebuild
+      pollSecuritySignals();
     } catch (e) {
       document.getElementById('alertsList').innerHTML =
         '<div class="alerts-loading">Could not load monitors — check DD_APP_KEY</div>';
