@@ -1173,6 +1173,40 @@ app.get('/api/security/file', (req, res) => {
   res.json({ file: filePath, content, timestamp: new Date().toISOString() });
 });
 
+// ── Security Signals proxy ────────────────────────────────
+// Polls Datadog Security Monitoring API for real ASM signals and returns
+// them so the frontend can show chips only when signals actually exist.
+app.get('/api/security/signals', async (req, res) => {
+  if (!process.env.DD_APP_KEY) return res.json({ signals: [], error: 'DD_APP_KEY not configured' });
+  const https  = require('https');
+  const site   = process.env.DD_SITE || 'datadoghq.com';
+  const from   = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(); // last 4 hours
+  const query  = encodeURIComponent('service:inspire-brands-platform');
+  const path   = `/api/v2/security_monitoring/signals?filter[query]=${query}&filter[from]=${encodeURIComponent(from)}&page[limit]=50&sort=-timestamp`;
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const reqDd = https.request(
+        { hostname: `api.${site}`, path, method: 'GET',
+          headers: { 'DD-API-KEY': process.env.DD_API_KEY, 'DD-APPLICATION-KEY': process.env.DD_APP_KEY, Accept: 'application/json' } },
+        r => { let b = ''; r.on('data', c => b += c); r.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve({}); } }); }
+      );
+      reqDd.on('error', reject);
+      reqDd.end();
+    });
+    const signals = (data.data || []).map(s => ({
+      id:        s.id,
+      title:     s.attributes?.title || 'Security Signal',
+      status:    s.attributes?.status || 'medium',
+      timestamp: s.attributes?.timestamp,
+      tags:      s.attributes?.tags || [],
+      url:       `https://app.${site}/security/appsec/signals/${s.id}`,
+    }));
+    res.json({ signals });
+  } catch (e) {
+    res.json({ signals: [], error: e.message });
+  }
+});
+
 // ── Error Tracking demo ───────────────────────────────────
 // Generates realistic backend errors that surface in Datadog Error Tracking
 // grouped by type/fingerprint, with full stack traces and span context.

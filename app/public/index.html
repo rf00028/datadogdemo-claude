@@ -1359,40 +1359,11 @@
 
   // ── Security attack simulations (ASM demo) ───────────────
   const SEC_PAYLOADS = {
-    sqli:      { path: "/api/security/scan?q=' OR 1=1--&user_id=admin", method: 'GET', body: null, label: 'SQL injection probe', short: 'SQL Injection' },
-    xss:       { path: "/api/security/scan?q=<script>alert('xss')<\/script>&user_id=test", method: 'GET', body: null, label: 'XSS probe', short: 'XSS Probe' },
-    traversal: { path: "/api/security/file?path=../../etc/passwd", method: 'GET', body: null, label: 'Path traversal probe', short: 'Path Traversal' },
-    login:     { path: "/api/security/login", method: 'POST', body: { username: "admin' OR '1'='1", password: 'password123' }, label: 'Brute-force login attempt', short: 'Brute-Force' },
+    sqli:      { path: "/api/security/scan?q=' OR 1=1--&user_id=admin", method: 'GET', body: null, label: 'SQL injection probe' },
+    xss:       { path: "/api/security/scan?q=<script>alert('xss')<\/script>&user_id=test", method: 'GET', body: null, label: 'XSS probe' },
+    traversal: { path: "/api/security/file?path=../../etc/passwd", method: 'GET', body: null, label: 'Path traversal probe' },
+    login:     { path: "/api/security/login", method: 'POST', body: { username: "admin' OR '1'='1", password: 'password123' }, label: 'Brute-force login attempt' },
   };
-
-  // Tracks active security signals: brandKey → [{type, short, ts}]
-  const secSignals = {};
-
-  function injectSecurityChips() {
-    const allKeys = [...(brandsData || []).map(b => b.key), '__platform__'];
-    allKeys.forEach(key => {
-      const signals = secSignals[key];
-      if (!signals || !signals.length) return;
-      const chipId = `sec-chip-${key}`;
-      if (document.getElementById(chipId)) return; // already injected
-      const row = document.querySelector(`.monitor-brand-row[data-brand="${key}"]`);
-      if (!row) return;
-      const chipsEl = row.querySelector('.monitor-chips');
-      if (!chipsEl) return;
-      const brandQuery = key === '__platform__'
-        ? 'service%3Ainspire-brands-platform'
-        : `team%3A${(brandsData.find(b => b.key === key) || {}).team || key}`;
-      const label = signals.map(s => s.short).join(', ');
-      const chip = document.createElement('a');
-      chip.id        = chipId;
-      chip.href      = `https://app.datadoghq.com/security/appsec?query=${brandQuery}`;
-      chip.target    = '_blank';
-      chip.className = 'monitor-chip chip-security';
-      chip.title     = `Security signals detected: ${label}`;
-      chip.innerHTML = `<span class="dot"></span><span class="chip-label">🛡 Security Signal</span>`;
-      chipsEl.appendChild(chip);
-    });
-  }
 
   async function secAttack(type) {
     const p = SEC_PAYLOADS[type];
@@ -1400,17 +1371,80 @@
     addLog('log-warn', null, p.method, p.path.split('?')[0], '→', `ASM probe: ${p.label}`);
     const res = await api(p.method, p.path, p.body, null);
     if (window.DD_RUM) {
-      window.DD_RUM.addAction('security_probe', { attack_type: type, label: p.label, status: res.status });
+      window.DD_RUM.addAction('security_probe', { attack_type: type, label: p.label, status: res?.status });
     }
-    // Record signal on all brand rows + platform
-    const allKeys = [...(brandsData || []).map(b => b.key), '__platform__'];
-    allKeys.forEach(key => {
-      if (!secSignals[key]) secSignals[key] = [];
-      if (!secSignals[key].find(s => s.type === type)) {
-        secSignals[key].push({ type, short: p.short, ts: Date.now() });
+  }
+
+  // ── Security signal poller ────────────────────────────────
+  // Polls /api/security/signals every 30s. Chips appear only when
+  // Datadog actually detects signals in the tenant — not on button click.
+  let _lastSignalIds = new Set();
+
+  function renderSecurityChips(signals) {
+    // Clear existing chips from all rows
+    document.querySelectorAll('.chip-security').forEach(c => c.remove());
+    if (!signals.length) return;
+
+    // Group signals by brand team tag (fall back to platform row)
+    const brandTeamMap = {};
+    (brandsData || []).forEach(b => { brandTeamMap[b.team] = b.key; });
+
+    // Determine which brand rows get chips (signals tagged with a brand team → that row; otherwise platform)
+    const rowSignals = {}; // brandKey → [signal, ...]
+    signals.forEach(sig => {
+      let assigned = false;
+      sig.tags.forEach(tag => {
+        const team = tag.startsWith('team:') ? tag.slice(5) : null;
+        if (team && brandTeamMap[team]) {
+          const bKey = brandTeamMap[team];
+          if (!rowSignals[bKey]) rowSignals[bKey] = [];
+          rowSignals[bKey].push(sig);
+          assigned = true;
+        }
+      });
+      if (!assigned) {
+        if (!rowSignals['__platform__']) rowSignals['__platform__'] = [];
+        rowSignals['__platform__'].push(sig);
       }
     });
-    injectSecurityChips();
+
+    // If no brand-specific signals, show on ALL rows (platform-wide attack)
+    const keys = Object.keys(rowSignals);
+    if (keys.length === 1 && keys[0] === '__platform__') {
+      const allKeys = [...(brandsData || []).map(b => b.key), '__platform__'];
+      allKeys.forEach(k => { rowSignals[k] = rowSignals['__platform__']; });
+    }
+
+    Object.entries(rowSignals).forEach(([key, sigs]) => {
+      const row = document.querySelector(`.monitor-brand-row[data-brand="${key}"]`);
+      if (!row) return;
+      const chipsEl = row.querySelector('.monitor-chips');
+      if (!chipsEl) return;
+      // Link to the most recent signal directly; fall back to filtered list
+      const topSig = sigs[0];
+      const chip = document.createElement('a');
+      chip.href      = topSig.url;
+      chip.target    = '_blank';
+      chip.className = 'monitor-chip chip-security';
+      chip.title     = `${sigs.length} signal${sigs.length !== 1 ? 's' : ''} detected: ${topSig.title}`;
+      chip.innerHTML = `<span class="dot"></span><span class="chip-label">🛡 ${sigs.length} Security Signal${sigs.length !== 1 ? 's' : ''}</span>`;
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  async function pollSecuritySignals() {
+    try {
+      const r    = await fetch('/api/security/signals');
+      const data = await r.json();
+      const sigs = data.signals || [];
+      // Only re-render if signal set changed
+      const ids = new Set(sigs.map(s => s.id));
+      const changed = ids.size !== _lastSignalIds.size || [...ids].some(id => !_lastSignalIds.has(id));
+      if (changed) {
+        _lastSignalIds = ids;
+        renderSecurityChips(sigs);
+      }
+    } catch (_) {}
   }
 
   // ── LLM quick-fire (opens chat + sends) ──────────────────
@@ -1673,8 +1707,8 @@
           <div class="monitor-chips">${chips}</div>
         </div>`;
       }).join('');
-      // Re-inject security signal chips after monitor rows are rebuilt
-      setTimeout(injectSecurityChips, 0);
+      // Re-render security chips after monitor rows rebuild
+      renderSecurityChips([..._lastSignalIds].length ? await fetch('/api/security/signals').then(r=>r.json()).then(d=>d.signals||[]).catch(()=>[]) : []);
     } catch (e) {
       document.getElementById('alertsList').innerHTML =
         '<div class="alerts-loading">Could not load monitors — check DD_APP_KEY</div>';
@@ -1696,6 +1730,8 @@
     setInterval(loadDDStats, 30000);
     setInterval(loadSloStatus, 30000);
     setInterval(loadDbmStats, 10000);
+    pollSecuritySignals();
+    setInterval(pollSecuritySignals, 30000);
   }
 
   init();
