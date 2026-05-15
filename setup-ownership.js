@@ -171,9 +171,19 @@ async function main() {
     },
   ];
 
-  // Create all rules and collect their IDs
+  // Fetch existing rules first, then create only missing ones
+  const existingResp = await ddRequest('GET', '/api/v2/scorecard/rules?page%5Bsize%5D=100');
+  const existingRules = existingResp.data?.data || [];
+  const existingByName = {};
+  existingRules.forEach(r => { existingByName[r.attributes.name] = r.id; });
+
   const ruleIds = {};
   for (const rule of RULES) {
+    if (existingByName[rule.name]) {
+      ruleIds[rule.name] = existingByName[rule.name];
+      console.log(`  ⏭  "${rule.name}" — already exists (id: ${existingByName[rule.name]})`);
+      continue;
+    }
     const result = await create(
       `📋 Rule: ${rule.name}`,
       'POST',
@@ -234,7 +244,7 @@ async function main() {
         '/api/v2/scorecard/outcomes/batch',
         {
           data: {
-            type: 'outcomes',
+            type: 'batched-outcome',
             attributes: {
               results: chunk,
             },
