@@ -124,24 +124,24 @@ const CUSTOM_RULES = [
 
 // ── Outcome logic ─────────────────────────────────────────────────────────────
 // Returns {state, remarks} for a given rule + service combination.
+// Demo story: sonic-pos is the "active incident" brand (multiple failures),
+//             jj-pos has two operational gaps. Everything else passes.
 function outcomeFor(ruleName, service, brand) {
-  const isSonic  = brand === 'sonic';
-  const isJJ     = brand === 'jimmy-johns';
-  const isBR     = brand === 'baskin-robbins';
-  const isPos    = service.endsWith('-pos');
+  const isSonic   = brand === 'sonic';
+  const isJJ      = brand === 'jimmy-johns';
+  const isPos     = service.endsWith('-pos');
   const isLoyalty = service.endsWith('-loyalty');
 
-  // Built-in rule outcomes
+  // ── Built-in rule outcomes ──────────────────────────────────────────────────
   if (ruleName === 'SLOs Defined') {
-    if (isSonic)  return { state: 'fail', remarks: 'SLO creation blocked — Sonic POS incident ongoing' };
+    if (isSonic && isPos) return { state: 'fail', remarks: 'SLO creation blocked — Sonic POS incident ongoing' };
     return { state: 'pass', remarks: 'Error budget SLO defined at 99.5% target' };
   }
   if (ruleName === 'Monitors Defined') {
     return { state: 'pass', remarks: 'POS error rate + p95 latency + anomaly detection monitors active' };
   }
   if (ruleName === 'On-call Defined') {
-    if (isJJ)    return { state: 'fail', remarks: 'On-call rotation not yet migrated to PagerDuty' };
-    if (isBR && isLoyalty) return { state: 'skip', remarks: 'Low-tier service — on-call not required' };
+    if (isJJ && isPos) return { state: 'fail', remarks: 'On-call rotation not yet migrated to PagerDuty' };
     return { state: 'pass', remarks: 'PagerDuty on-call rotation configured for team' };
   }
   if (ruleName === 'Deployed in the past 3 months') {
@@ -152,49 +152,42 @@ function outcomeFor(ruleName, service, brand) {
     return { state: 'pass', remarks: 'dd-trace logInjection enabled — trace_id injected in all logs' };
   }
   if (ruleName === 'Deployment tracking is active') {
-    if (isJJ)   return { state: 'fail', remarks: 'Deployment events not configured in CI pipeline' };
     return { state: 'pass', remarks: 'DD_VERSION set per deploy; deployment events sent via CI' };
   }
   if (ruleName === 'Team Defined') {
     return { state: 'pass', remarks: `Owned by ${brand}-ops team in Service Catalog` };
   }
   if (ruleName === 'Contacts Defined') {
-    if (isBR)   return { state: 'fail', remarks: 'Slack + PagerDuty contacts not yet added to catalog entry' };
     return { state: 'pass', remarks: 'Slack channel + on-call contact defined' };
   }
   if (ruleName === 'Code Repos Defined') {
-    if (isJJ)   return { state: 'fail', remarks: 'Repo link missing from Service Catalog entry' };
     return { state: 'pass', remarks: 'GitHub repo linked in Service Catalog' };
   }
   if (ruleName === 'Docs Defined') {
-    if (isSonic) return { state: 'fail', remarks: 'Runbook outdated — last updated 6 months ago' };
-    if (isBR && isLoyalty) return { state: 'fail', remarks: 'No runbook linked for loyalty service' };
+    if (isSonic && isPos) return { state: 'fail', remarks: 'Runbook outdated — last updated 6 months ago during active incident' };
     return { state: 'pass', remarks: 'Confluence runbook linked from Service Catalog' };
   }
 
-  // Custom rule outcomes
+  // ── Custom rule outcomes ────────────────────────────────────────────────────
   if (ruleName === 'POS error rate monitor defined') {
     if (!isPos) return { state: 'skip', remarks: 'Non-POS service — rule not applicable' };
     return { state: 'pass', remarks: 'POS error rate monitor active with p95 and anomaly detection' };
   }
   if (ruleName === 'p95 latency monitor defined') {
-    if (!isPos) return { state: 'skip', remarks: 'Latency SLO applies to POS services only' };
+    if (!isPos) return { state: 'skip', remarks: 'Latency monitor applies to POS services only' };
     if (isSonic) return { state: 'fail', remarks: 'Latency monitor deleted during incident — needs recreation' };
     return { state: 'pass', remarks: 'p95 latency monitor set at 1500ms threshold' };
   }
   if (ruleName === 'Order success rate SLO exists') {
     if (isLoyalty) return { state: 'skip', remarks: 'Loyalty lookups tracked separately — not in order SLO scope' };
     if (isSonic)   return { state: 'fail', remarks: 'SLO breach in progress — error budget exhausted' };
-    if (isJJ)      return { state: 'fail', remarks: 'SLO target not yet agreed with franchise ops team' };
     return { state: 'pass', remarks: '99.5% order success rate SLO — 14-day rolling window' };
   }
   if (ruleName === 'Multi-channel traffic instrumented') {
-    if (isBR && isPos) return { state: 'fail', remarks: 'Online channel missing channel tag — catering orders untracked' };
     return { state: 'pass', remarks: 'All channels tagged: in-store, drive-thru, delivery, mobile-order' };
   }
   if (ruleName === 'Chaos scenario tested in last 30 days') {
-    if (isJJ)        return { state: 'fail', remarks: 'No chaos tests run this month — team backlog prioritization' };
-    if (isBR && isLoyalty) return { state: 'fail', remarks: 'Chaos testing skipped for low-traffic loyalty service' };
+    if (isJJ && isPos) return { state: 'fail', remarks: 'No chaos tests run this month — team backlog prioritization' };
     return { state: 'pass', remarks: 'Payment timeout + loyalty outage scenarios validated this month' };
   }
 
