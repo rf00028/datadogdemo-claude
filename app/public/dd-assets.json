@@ -31,7 +31,8 @@
     "costDashboard": "https://app.datadoghq.com/account/usage",
     "costManagement": "https://app.datadoghq.com/cost/summary",
     "usageAttribution": "https://app.datadoghq.com/account/usage/attribution",
-    "usageSummary": "https://app.datadoghq.com/account/usage"
+    "usageSummary": "https://app.datadoghq.com/account/usage",
+    "slos": "https://app.datadoghq.com/slos"
   },
   "brandLinks": {
     "arbys": {
@@ -70,5 +71,121 @@
       "monitors": "https://app.datadoghq.com/monitors/manage?q=team%3Ajj-ops",
       "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform+brand%3Ajimmy-johns"
     }
+  },
+  "slos": [
+    {
+      "brand": "arbys",
+      "type": "availability"
+    },
+    {
+      "brand": "arbys",
+      "type": "latency"
+    },
+    {
+      "brand": "bww",
+      "type": "availability"
+    },
+    {
+      "brand": "bww",
+      "type": "latency"
+    },
+    {
+      "brand": "sonic",
+      "type": "availability"
+    },
+    {
+      "brand": "sonic",
+      "type": "latency"
+    },
+    {
+      "brand": "dunkin",
+      "type": "availability"
+    },
+    {
+      "brand": "dunkin",
+      "type": "latency"
+    },
+    {
+      "brand": "baskin-robbins",
+      "type": "availability"
+    },
+    {
+      "brand": "baskin-robbins",
+      "type": "latency"
+    },
+    {
+      "brand": "jimmy-johns",
+      "type": "availability"
+    },
+    {
+      "brand": "jimmy-johns",
+      "type": "latency"
+    },
+    {
+      "brand": "platform",
+      "type": "availability"
+    },
+    {
+      "brand": "platform",
+      "type": "loyalty"
+    },
+    {
+      "brand": "platform",
+      "type": "delivery"
+    }
+  ],
+  "privateLocationId": "pl:inspire-brands-local-demo-3bdbe71da39d54a108a07f1b02e88428",
+  "rum": {
+    "arbys": {
+      "applicationId": "38606c9e-cc35-4d34-8230-c41ac46920a7",
+      "clientToken": "pub532ac8806f03b5ed00fd3fac771c3d22",
+      "name": "Inspire Brands Arby's Web",
+      "service": "inspire-arbys-web"
+    },
+    "bww": {
+      "applicationId": "a2a337e7-b931-4ddc-b025-55a0a8f7c013",
+      "clientToken": "pubad676753782576da0edd4654347ea838",
+      "name": "Inspire Brands Buffalo Wild Wings Web",
+      "service": "inspire-bww-web"
+    },
+    "sonic": {
+      "applicationId": "98d3b211-ba18-4935-9043-bb53c7a93f66",
+      "clientToken": "pubed28f88e075de34475f93e4d71d7c2b7",
+      "name": "Inspire Brands Sonic Drive-In Web",
+      "service": "inspire-sonic-web"
+    },
+    "dunkin": {
+      "applicationId": "3972633d-1d52-4a91-a3a6-b160cabd4d05",
+      "clientToken": "pubf2d69ea86f93d9b3806d559291f09736",
+      "name": "Inspire Brands Dunkin' Web",
+      "service": "inspire-dunkin-web"
+    },
+    "baskin-robbins": {
+      "applicationId": "5ce0c8be-e161-4b04-88f8-9637876545b8",
+      "clientToken": "puba2b1d8e788c0ce91009f836c6ac155b8",
+      "name": "Inspire Brands Baskin-Robbins Web",
+      "service": "inspire-baskin-robbins-web"
+    },
+    "jimmy-johns": {
+      "applicationId": "62006c19-d06e-4ab3-8df7-3bbb7c72f1e3",
+      "clientToken": "pub5db1b29b0db7e1b512521395d927dd19",
+      "name": "Inspire Brands Jimmy John's Web",
+      "service": "inspire-jimmy-johns-web"
+    },
+    "global": {
+      "applicationId": "2b5ca439-1028-419f-88ba-f0be6c5ea7d7",
+      "clientToken": "pub04e70b60c4fb74b4fc6f78919ebad6e7",
+      "name": "Inspire Brands Global Portal",
+      "service": "inspire-global-web"
+    }
+  },
+  "synthRum": {},
+  "brandLogoUrls": {
+    "arbys": "https://inspirebrands.com/wp-content/uploads/2017/10/Arbys.jpg",
+    "bww": "https://inspirebrands.com/wp-content/uploads/2018/08/Buffalo-Wild-Wings-Logo-Horizontal.jpg",
+    "sonic": "https://inspirebrands.com/wp-content/uploads/2020/02/Sonic_Logo-1-scaled.jpg",
+    "dunkin": "https://inspirebrands.com/wp-content/uploads/2023/10/Dunkin_Icon_2color_RGB-2.png",
+    "baskin-robbins": "https://inspirebrands.com/wp-content/uploads/2022/04/IB_BROnlineStamp-01.png",
+    "jimmy-johns": "https://inspirebrands.com/wp-content/uploads/2023/10/JJ-Red-2.png"
   }
 }
