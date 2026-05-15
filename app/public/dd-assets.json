@@ -21,7 +21,17 @@
     "logs": "https://app.datadoghq.com/logs?query=service%3Ainspire-brands-platform",
     "teams": "https://app.datadoghq.com/organization-settings/teams",
     "llmObs": "https://app.datadoghq.com/llm/traces",
-    "scorecards": "https://app.datadoghq.com/catalog/scorecard"
+    "scorecards": "https://app.datadoghq.com/catalog/scorecard",
+    "incidents": "https://app.datadoghq.com/incidents",
+    "incidentsList": "https://app.datadoghq.com/incidents",
+    "workflows": "https://app.datadoghq.com/workflow/",
+    "errorTracking": "https://app.datadoghq.com/error-tracking",
+    "sensitiveDataScanner": "https://app.datadoghq.com/organization-settings/sensitive-data-scanner",
+    "sdsGroup": "https://app.datadoghq.com/organization-settings/sensitive-data-scanner",
+    "costDashboard": "https://app.datadoghq.com/account/usage",
+    "costManagement": "https://app.datadoghq.com/cost/summary",
+    "usageAttribution": "https://app.datadoghq.com/account/usage/attribution",
+    "usageSummary": "https://app.datadoghq.com/account/usage"
   },
   "brandLinks": {
     "arbys": {
