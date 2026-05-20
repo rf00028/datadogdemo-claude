@@ -1199,7 +1199,7 @@ app.get('/api/security/signals', async (req, res) => {
       status:    s.attributes?.status || 'medium',
       timestamp: s.attributes?.timestamp,
       tags:      s.attributes?.tags || [],
-      url:       `https://app.${site}/security/appsec/signals/${s.id}`,
+      url:       `https://app.${site}/security/signal/${s.id}`,
     }));
     res.json({ signals });
   } catch (e) {
