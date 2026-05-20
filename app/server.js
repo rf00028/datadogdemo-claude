@@ -1836,6 +1836,90 @@ function scheduleBackgroundTraffic() {
   Promise.allSettled(fires).then(() => setTimeout(scheduleBackgroundTraffic, intervalMs));
 }
 
+// ── Self-Service Actions ────────────────────────────────────────────────────
+
+app.post('/api/self-service/block-ip', async (req, res) => {
+  const { ip, duration = 86400, reason = 'Blocked via self-service action' } = req.body;
+  if (!ip) return res.status(400).json({ ok: false, error: 'IP address required' });
+  const https = require('https');
+  const site  = process.env.DD_SITE || 'datadoghq.com';
+  const attrs = {
+    name:              `Self-service block: ${ip}`,
+    description:       reason,
+    enabled:           true,
+    suppression_query: `@network.client.ip:${ip}`,
+  };
+  if (duration > 0) attrs.expiration_date = new Date(Date.now() + duration * 1000).toISOString().replace(/\.\d+Z$/, 'Z');
+  const payload = JSON.stringify({ data: { type: 'suppressions', attributes: attrs } });
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const r = https.request({
+        hostname: `api.${site}`, path: '/api/v2/security_monitoring/suppressions',
+        method: 'POST',
+        headers: { 'DD-API-KEY': process.env.DD_API_KEY, 'DD-APPLICATION-KEY': process.env.DD_APP_KEY,
+                   'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+      }, res => { let b = ''; res.on('data', c => b += c); res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(b) }); } catch { resolve({ status: res.statusCode, body: b }); } }); });
+      r.on('error', reject); r.write(payload); r.end();
+    });
+    if (result.status === 200 || result.status === 201) {
+      logger.info('Self-service: IP suppressed', { ip, duration });
+      res.json({ ok: true, message: `IP ${ip} suppressed in Datadog ASM`, suppressionId: result.body.data?.id });
+    } else {
+      res.json({ ok: false, error: `Datadog API returned ${result.status}`, detail: result.body });
+    }
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/self-service/incident', async (req, res) => {
+  const { title, severity = 'SEV-3' } = req.body;
+  if (!title) return res.status(400).json({ ok: false, error: 'Title required' });
+  const https = require('https');
+  const site  = process.env.DD_SITE || 'datadoghq.com';
+  const sevMap = { 'SEV-1': 'sev-1', 'SEV-2': 'sev-2', 'SEV-3': 'sev-3', 'SEV-4': 'sev-4' };
+  const payload = JSON.stringify({
+    data: { type: 'incidents', attributes: {
+      title, severity: sevMap[severity] || 'sev-3',
+      customer_impacted: false,
+      fields: { summary: { type: 'textbox', value: `Created via Inspire Brands self-service portal. Severity: ${severity}.` } }
+    }}
+  });
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const r = https.request({
+        hostname: `api.${site}`, path: '/api/v2/incidents', method: 'POST',
+        headers: { 'DD-API-KEY': process.env.DD_API_KEY, 'DD-APPLICATION-KEY': process.env.DD_APP_KEY,
+                   'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+      }, res => { let b = ''; res.on('data', c => b += c); res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(b) }); } catch { resolve({ status: res.statusCode, body: b }); } }); });
+      r.on('error', reject); r.write(payload); r.end();
+    });
+    if (result.status === 201) {
+      const id = result.body.data?.id;
+      logger.info('Self-service: Incident created', { title, severity, id });
+      res.json({ ok: true, message: `Incident "${title}" created (${severity})`, incidentId: id, url: `https://app.${site}/incidents/${id}` });
+    } else {
+      res.json({ ok: false, error: `Datadog API returned ${result.status}`, detail: result.body });
+    }
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/self-service/simulate', async (req, res) => {
+  const { action, brand, details } = req.body;
+  if (!action) return res.status(400).json({ ok: false, error: 'action required' });
+  logger.info('Self-service action', { action, brand, details });
+  dogstatsd.event(`self-service.${action}`, JSON.stringify(details || {}), {
+    alert_type: 'info',
+    tags: [`action:${action}`, brand ? `brand:${brand}` : 'brand:platform', 'source:self-service'],
+  });
+  await new Promise(r => setTimeout(r, 600));
+  const labels = {
+    rollback:            `Rollback to ${details?.version} initiated for ${brand || 'platform'}`,
+    'scale-traffic':     `Scaled ${brand || 'all brands'} to ${details?.factor} for ${details?.duration}`,
+    'menu-update':       `Menu update (${details?.type}: "${details?.item}") deployed to ${brand}`,
+    'rotate-credentials': `Credentials rotated for ${details?.service} (${details?.type})`,
+  };
+  res.json({ ok: true, message: labels[action] || `${action} completed` });
+});
+
 async function startup() {
   try {
     const client = await db.connect();

@@ -239,6 +239,75 @@
     .toggle.chaos input:checked + .slider { background: #dc2626; }
     .toggle.chaos input:checked + .slider:before { background: #fff; }
 
+    /* ── Self-Service Actions ── */
+    .blueprint-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+    .blueprint-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex; flex-direction: column; gap: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      cursor: default;
+    }
+    .blueprint-card:hover { border-color: rgba(99,44,166,0.5); box-shadow: 0 0 0 1px rgba(99,44,166,0.15); }
+    .blueprint-tag {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--subtle);
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 8px; display: inline-block; align-self: flex-start;
+    }
+    .blueprint-card h3 { font-size: 0.92rem; font-weight: 700; color: #fff; margin: 0; }
+    .blueprint-card p  { font-size: 0.75rem; color: var(--subtle); margin: 0; line-height: 1.55; flex: 1; }
+    .blueprint-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+    .blueprint-icon   { font-size: 1.8rem; opacity: 0.75; line-height: 1; }
+    .btn-blueprint {
+      background: #632ca6; color: #fff; border: none; border-radius: 6px;
+      padding: 7px 18px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-blueprint:hover { background: #7c3cc4; }
+    /* Modal */
+    .ssa-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .ssa-overlay.open { display: flex; }
+    .ssa-modal {
+      background: #1a1a2e; border: 1px solid rgba(99,44,166,0.45);
+      border-radius: 12px; width: 480px; max-width: 95vw;
+      padding: 26px 28px; display: flex; flex-direction: column; gap: 16px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+    }
+    .ssa-modal-header { display: flex; align-items: flex-start; justify-content: space-between; }
+    .ssa-modal-title { font-size: 1.05rem; font-weight: 700; color: #fff; }
+    .ssa-modal-close { background: none; border: none; color: var(--subtle); font-size: 1.4rem; cursor: pointer; line-height: 1; padding: 0; }
+    .ssa-modal-close:hover { color: #fff; }
+    .ssa-field { display: flex; flex-direction: column; gap: 5px; }
+    .ssa-field label { font-size: 0.68rem; font-weight: 700; color: var(--subtle); text-transform: uppercase; letter-spacing: 0.06em; }
+    .ssa-field input, .ssa-field select, .ssa-field textarea {
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 0.82rem;
+      padding: 8px 12px; outline: none; font-family: inherit; width: 100%; box-sizing: border-box;
+    }
+    .ssa-field input:focus, .ssa-field select:focus, .ssa-field textarea:focus { border-color: #632ca6; }
+    .ssa-field select option { background: #1a1a2e; }
+    .ssa-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+    .btn-ssa-cancel { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 20px; font-size: 0.82rem; cursor: pointer; }
+    .btn-ssa-cancel:hover { border-color: var(--muted); }
+    .btn-ssa-run { background: #632ca6; color: #fff; border: none; border-radius: 6px; padding: 8px 24px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: background 0.15s; min-width: 100px; }
+    .btn-ssa-run:hover { background: #7c3cc4; }
+    .btn-ssa-run:disabled { opacity: 0.6; cursor: not-allowed; }
+    .ssa-result { padding: 12px 16px; border-radius: 8px; font-size: 0.82rem; line-height: 1.55; }
+    .ssa-result.ok  { background: rgba(34,197,94,0.1);  border: 1px solid rgba(34,197,94,0.3);  color: #4ade80; }
+    .ssa-result.err { background: rgba(239,68,68,0.1);   border: 1px solid rgba(239,68,68,0.3);  color: #f87171; }
+
     /* ── Scenario panel ── */
     .scenario-grid {
       display: grid;
@@ -590,6 +659,7 @@
     <a class="dd-link" id="lnkIncidents" href="https://app.datadoghq.com/incidents" target="_blank">🚨 Incidents</a>
     <a class="dd-link" id="lnkSds" href="https://app.datadoghq.com/organization-settings/sensitive-data-scanner" target="_blank">🔐 Sensitive Data</a>
     <a class="dd-link" id="lnkCost" href="https://app.datadoghq.com/cost/summary" target="_blank">💰 Cost</a>
+    <a class="dd-link" href="#ssaSection" onclick="document.getElementById('ssaSection').scrollIntoView({behavior:'smooth'});return false;" style="border-color:rgba(99,44,166,0.5);color:#c084fc;">⚡ Self-Service</a>
   </div>
 
   <!-- ── Platform KPIs ── -->
@@ -717,6 +787,93 @@
       <div id="sdsResult" style="font-size:0.72rem;margin-top:8px;color:var(--subtle);min-height:16px;"></div>
     </div>
 
+  </div>
+
+  <!-- ── Self-Service Actions ── -->
+  <div id="ssaSection">
+    <div class="section-header" style="margin-top:36px;">
+      <h2>Self-Service Actions</h2>
+    </div>
+    <div style="font-size:0.75rem;color:var(--subtle);margin-bottom:14px;">Provision infrastructure, remediate incidents, and respond to security threats — without opening a ticket.</div>
+    <div class="blueprint-grid">
+
+      <div class="blueprint-card">
+        <span class="blueprint-tag">Security</span>
+        <h3>Block Attacking IP</h3>
+        <p>Suppress an attacker's IP in Datadog ASM. Pulls the current signal's source IP automatically and creates an ASM suppression rule.</p>
+        <div class="blueprint-footer">
+          <span class="blueprint-icon">🚫</span>
+          <button class="btn-blueprint" onclick="ssaOpen('block-ip')">Run Action</button>
+        </div>
+      </div>
+
+      <div class="blueprint-card">
+        <span class="blueprint-tag">Incident Management</span>
+        <h3>Declare Incident</h3>
+        <p>Escalate an active alert into a Datadog Incident, set severity, and automatically notify the on-call team.</p>
+        <div class="blueprint-footer">
+          <span class="blueprint-icon">🚨</span>
+          <button class="btn-blueprint" onclick="ssaOpen('declare-incident')">Run Action</button>
+        </div>
+      </div>
+
+      <div class="blueprint-card">
+        <span class="blueprint-tag">Release Management</span>
+        <h3>Roll Back Deployment</h3>
+        <p>Roll back a brand service to a previous stable version. Creates a Datadog deployment event and notifies the brand team.</p>
+        <div class="blueprint-footer">
+          <span class="blueprint-icon">🔄</span>
+          <button class="btn-blueprint" onclick="ssaOpen('rollback')">Run Action</button>
+        </div>
+      </div>
+
+      <div class="blueprint-card">
+        <span class="blueprint-tag">Infrastructure Provisioning</span>
+        <h3>Scale for Peak Traffic</h3>
+        <p>Increase service capacity ahead of a game-day or promotional surge. Applies across all brand order endpoints.</p>
+        <div class="blueprint-footer">
+          <span class="blueprint-icon">📈</span>
+          <button class="btn-blueprint" onclick="ssaOpen('scale-traffic')">Run Action</button>
+        </div>
+      </div>
+
+      <div class="blueprint-card">
+        <span class="blueprint-tag">Release Management</span>
+        <h3>Deploy Menu Update</h3>
+        <p>Push a menu item or price change to a specific brand's order platform without a full deployment cycle.</p>
+        <div class="blueprint-footer">
+          <span class="blueprint-icon">🍔</span>
+          <button class="btn-blueprint" onclick="ssaOpen('menu-update')">Run Action</button>
+        </div>
+      </div>
+
+      <div class="blueprint-card">
+        <span class="blueprint-tag">Security</span>
+        <h3>Rotate Service Credentials</h3>
+        <p>Trigger a credential rotation across the platform after a security incident. Revokes and reissues API keys.</p>
+        <div class="blueprint-footer">
+          <span class="blueprint-icon">🔑</span>
+          <button class="btn-blueprint" onclick="ssaOpen('rotate-creds')">Run Action</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Self-Service Modal ── -->
+  <div class="ssa-overlay" id="ssaOverlay" onclick="if(event.target===this)ssaClose()">
+    <div class="ssa-modal" id="ssaModal">
+      <div class="ssa-modal-header">
+        <div class="ssa-modal-title" id="ssaTitle"></div>
+        <button class="ssa-modal-close" onclick="ssaClose()">✕</button>
+      </div>
+      <div id="ssaForm"></div>
+      <div id="ssaResultBox" style="display:none"></div>
+      <div class="ssa-modal-actions" id="ssaModalActions">
+        <button class="btn-ssa-cancel" onclick="ssaClose()">Cancel</button>
+        <button class="btn-ssa-run" id="ssaRunBtn" onclick="ssaRun()">Run Action</button>
+      </div>
+    </div>
   </div>
 
   <!-- ── Tools row ── -->
@@ -1750,6 +1907,289 @@
   }
 
   init();
+
+  // ── Self-Service Actions ──────────────────────────────────
+  let _ssaAction = null;
+
+  const SSA_CONFIG = {
+    'block-ip': {
+      title: '🚫 Block Attacking IP',
+      fields: () => {
+        const ip = [...(_lastSignalIds || [])].length
+          ? '' : '';
+        // Try to pull IP from latest signal
+        const sigEntry = document.querySelector('[id^="sec-chip-"]');
+        return `
+          <div class="ssa-field">
+            <label>Attacker IP Address</label>
+            <input id="ssa-ip" type="text" placeholder="198.51.100.42" />
+          </div>
+          <div class="ssa-field">
+            <label>Block Duration</label>
+            <select id="ssa-duration">
+              <option value="3600">1 hour</option>
+              <option value="86400" selected>24 hours</option>
+              <option value="604800">7 days</option>
+              <option value="0">Permanent</option>
+            </select>
+          </div>
+          <div class="ssa-field">
+            <label>Reason</label>
+            <input id="ssa-reason" type="text" value="SQL injection attack detected via Datadog ASM" />
+          </div>`;
+      },
+      run: async () => {
+        const ip       = document.getElementById('ssa-ip').value.trim();
+        const duration = parseInt(document.getElementById('ssa-duration').value);
+        const reason   = document.getElementById('ssa-reason').value.trim();
+        if (!ip) throw new Error('IP address is required');
+        const r = await fetch('/api/self-service/block-ip', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, duration, reason })
+        });
+        return r.json();
+      }
+    },
+    'declare-incident': {
+      title: '🚨 Declare Incident',
+      fields: () => `
+        <div class="ssa-field">
+          <label>Incident Title</label>
+          <input id="ssa-inc-title" type="text" value="SQL Injection Attack — Inspire Brands Platform" />
+        </div>
+        <div class="ssa-field">
+          <label>Severity</label>
+          <select id="ssa-inc-sev">
+            <option value="SEV-1">SEV-1 — Critical</option>
+            <option value="SEV-2">SEV-2 — High</option>
+            <option value="SEV-3" selected>SEV-3 — Medium</option>
+            <option value="SEV-4">SEV-4 — Low</option>
+          </select>
+        </div>
+        <div class="ssa-field">
+          <label>Incident Commander</label>
+          <input id="ssa-inc-cmd" type="text" placeholder="e.g. @jane.doe" />
+        </div>`,
+      run: async () => {
+        const title = document.getElementById('ssa-inc-title').value.trim();
+        const sev   = document.getElementById('ssa-inc-sev').value;
+        const cmd   = document.getElementById('ssa-inc-cmd').value.trim();
+        if (!title) throw new Error('Title is required');
+        const r = await fetch('/api/self-service/incident', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, severity: sev, commander: cmd })
+        });
+        return r.json();
+      }
+    },
+    'rollback': {
+      title: '🔄 Roll Back Deployment',
+      fields: () => {
+        const opts = (brandsData || []).map(b => `<option value="${b.key}">${b.name}</option>`).join('');
+        return `
+          <div class="ssa-field">
+            <label>Brand Service</label>
+            <select id="ssa-rb-brand"><option value="platform">Platform (all brands)</option>${opts}</select>
+          </div>
+          <div class="ssa-field">
+            <label>Roll Back To Version</label>
+            <select id="ssa-rb-ver">
+              <option value="v1.9.2">v1.9.2 (previous)</option>
+              <option value="v1.9.1">v1.9.1</option>
+              <option value="v1.8.5">v1.8.5 (stable)</option>
+            </select>
+          </div>
+          <div class="ssa-field">
+            <label>Reason</label>
+            <input id="ssa-rb-reason" type="text" placeholder="e.g. Elevated error rate after v2.0 deploy" />
+          </div>`;
+      },
+      run: async () => {
+        const brand  = document.getElementById('ssa-rb-brand').value;
+        const ver    = document.getElementById('ssa-rb-ver').value;
+        const reason = document.getElementById('ssa-rb-reason').value.trim();
+        const r = await fetch('/api/self-service/simulate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'rollback', brand, details: { version: ver, reason } })
+        });
+        return r.json();
+      }
+    },
+    'scale-traffic': {
+      title: '📈 Scale for Peak Traffic',
+      fields: () => {
+        const opts = (brandsData || []).map(b => `<option value="${b.key}">${b.name}</option>`).join('');
+        return `
+          <div class="ssa-field">
+            <label>Target Brand</label>
+            <select id="ssa-sc-brand"><option value="platform">All Brands</option>${opts}</select>
+          </div>
+          <div class="ssa-field">
+            <label>Scale Factor</label>
+            <select id="ssa-sc-factor">
+              <option value="2x">2× capacity</option>
+              <option value="4x">4× capacity</option>
+              <option value="8x">8× capacity</option>
+            </select>
+          </div>
+          <div class="ssa-field">
+            <label>Duration</label>
+            <select id="ssa-sc-dur">
+              <option value="2h">2 hours</option>
+              <option value="4h">4 hours</option>
+              <option value="8h">8 hours</option>
+              <option value="24h">24 hours</option>
+            </select>
+          </div>`;
+      },
+      run: async () => {
+        const brand  = document.getElementById('ssa-sc-brand').value;
+        const factor = document.getElementById('ssa-sc-factor').value;
+        const dur    = document.getElementById('ssa-sc-dur').value;
+        const r = await fetch('/api/self-service/simulate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'scale-traffic', brand, details: { factor, duration: dur } })
+        });
+        return r.json();
+      }
+    },
+    'menu-update': {
+      title: '🍔 Deploy Menu Update',
+      fields: () => {
+        const opts = (brandsData || []).map(b => `<option value="${b.key}">${b.name}</option>`).join('');
+        return `
+          <div class="ssa-field">
+            <label>Brand</label>
+            <select id="ssa-mu-brand">${opts}</select>
+          </div>
+          <div class="ssa-field">
+            <label>Change Type</label>
+            <select id="ssa-mu-type">
+              <option value="add">Add item</option>
+              <option value="remove">Remove item</option>
+              <option value="price">Price update</option>
+              <option value="availability">Availability change</option>
+            </select>
+          </div>
+          <div class="ssa-field">
+            <label>Item Name</label>
+            <input id="ssa-mu-item" type="text" placeholder="e.g. Spicy Crispy Chicken Sandwich" />
+          </div>`;
+      },
+      run: async () => {
+        const brand = document.getElementById('ssa-mu-brand').value;
+        const type  = document.getElementById('ssa-mu-type').value;
+        const item  = document.getElementById('ssa-mu-item').value.trim();
+        if (!item) throw new Error('Item name is required');
+        const r = await fetch('/api/self-service/simulate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'menu-update', brand, details: { type, item } })
+        });
+        return r.json();
+      }
+    },
+    'rotate-creds': {
+      title: '🔑 Rotate Service Credentials',
+      fields: () => `
+        <div class="ssa-field">
+          <label>Service</label>
+          <select id="ssa-rc-svc">
+            <option value="pos-api">POS API Gateway</option>
+            <option value="loyalty-svc">Loyalty Service</option>
+            <option value="delivery-api">Delivery API</option>
+            <option value="order-svc">Order Service</option>
+          </select>
+        </div>
+        <div class="ssa-field">
+          <label>Credential Type</label>
+          <select id="ssa-rc-type">
+            <option value="api-key">API Key</option>
+            <option value="db-password">DB Password</option>
+            <option value="jwt-secret">JWT Secret</option>
+          </select>
+        </div>
+        <div class="ssa-field">
+          <label>Confirm — type ROTATE to proceed</label>
+          <input id="ssa-rc-confirm" type="text" placeholder="ROTATE" />
+        </div>`,
+      run: async () => {
+        const svc     = document.getElementById('ssa-rc-svc').value;
+        const type    = document.getElementById('ssa-rc-type').value;
+        const confirm = document.getElementById('ssa-rc-confirm').value.trim();
+        if (confirm !== 'ROTATE') throw new Error('Type ROTATE to confirm');
+        const r = await fetch('/api/self-service/simulate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'rotate-credentials', details: { service: svc, type } })
+        });
+        return r.json();
+      }
+    },
+  };
+
+  function ssaOpen(action) {
+    _ssaAction = action;
+    const cfg = SSA_CONFIG[action];
+    if (!cfg) return;
+    document.getElementById('ssaTitle').textContent = cfg.title;
+    document.getElementById('ssaForm').innerHTML = cfg.fields();
+    document.getElementById('ssaResultBox').style.display = 'none';
+    document.getElementById('ssaResultBox').innerHTML = '';
+    document.getElementById('ssaModalActions').style.display = 'flex';
+    document.getElementById('ssaRunBtn').disabled = false;
+    document.getElementById('ssaRunBtn').textContent = 'Run Action';
+    document.getElementById('ssaOverlay').classList.add('open');
+    // Auto-fill IP from latest security signal if available
+    if (action === 'block-ip') {
+      fetch('/api/security/signals').then(r => r.json()).then(d => {
+        const sig = (d.signals || [])[0];
+        if (sig) {
+          const ipTag = (sig.tags || []).find(t => t.startsWith('network.client.ip:') || t.startsWith('@network.client.ip:'));
+          const ip = ipTag ? ipTag.split(':')[1] : '198.51.100.42';
+          const el = document.getElementById('ssa-ip');
+          if (el && !el.value) el.value = ip;
+        } else {
+          const el = document.getElementById('ssa-ip');
+          if (el && !el.value) el.value = '198.51.100.42';
+        }
+      }).catch(() => {});
+    }
+  }
+
+  function ssaClose() {
+    document.getElementById('ssaOverlay').classList.remove('open');
+    _ssaAction = null;
+  }
+
+  async function ssaRun() {
+    const cfg = SSA_CONFIG[_ssaAction];
+    if (!cfg) return;
+    const btn = document.getElementById('ssaRunBtn');
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+    const resultBox = document.getElementById('ssaResultBox');
+    resultBox.style.display = 'none';
+    try {
+      const data = await cfg.run();
+      resultBox.className = 'ssa-result ' + (data.ok ? 'ok' : 'err');
+      let msg = data.ok ? '✓ ' : '✗ ';
+      msg += data.message || data.error || JSON.stringify(data);
+      if (data.url) msg += `\n<a href="${data.url}" target="_blank" style="color:inherit;opacity:0.8;">↗ View in Datadog</a>`;
+      resultBox.innerHTML = msg.replace(/\n/g, '<br>');
+      resultBox.style.display = 'block';
+      if (data.ok) {
+        document.getElementById('ssaModalActions').style.display = 'none';
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+      }
+    } catch (e) {
+      resultBox.className = 'ssa-result err';
+      resultBox.textContent = '✗ ' + e.message;
+      resultBox.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Retry';
+    }
+  }
 </script>
 
 <!-- ── Chat widget ── -->
