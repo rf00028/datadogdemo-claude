@@ -1,9 +1,6 @@
-const CUSTOMER   = require('./customer.config');
-const LOCATIONS  = require('./locations.config');
-
-// dd-trace MUST be initialized before any other requires
+// dd-trace MUST be the very first require — before any other module
 const tracer = require('dd-trace').init({
-  service: CUSTOMER.platform,
+  service: process.env.DD_SERVICE || 'inspire-brands-platform',
   env: process.env.DD_ENV || 'local',
   version: process.env.DD_VERSION || '1.0.0',
   logInjection: true,
@@ -14,6 +11,9 @@ const tracer = require('dd-trace').init({
 
 const ddTrace = require('dd-trace');
 const LLMObs  = ddTrace.llmobs;
+
+const CUSTOMER   = require('./customer.config');
+const LOCATIONS  = require('./locations.config');
 
 const express        = require('express');
 const path           = require('path');

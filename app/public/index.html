@@ -1721,6 +1721,8 @@
         </div>`;
       }).join('');
       // Re-apply security chip states after monitor rows rebuild
+      // Clear cache so same signal IDs still trigger a re-render on fresh rows
+      _lastSignalIds = new Set();
       pollSecuritySignals();
     } catch (e) {
       document.getElementById('alertsList').innerHTML =

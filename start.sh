@@ -62,6 +62,18 @@ echo "    node setup-sds.js         # Sensitive Data Scanner rules (PCI/PII)"
 echo "    node setup-cost.js        # Cost Attribution dashboard"
 echo ""
 
+# ── Clear any OTEL env vars that would redirect dd-trace away from the Datadog Agent ──
+# (Claude Code sets OTEL_TRACES_EXPORTER=otlp pointing to its own telemetry endpoint,
+#  which causes dd-trace to send traces there instead of to localhost:8126)
+unset OTEL_TRACES_EXPORTER
+unset OTEL_EXPORTER_OTLP_ENDPOINT
+unset OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+unset OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+unset OTEL_EXPORTER_OTLP_LOGS_ENDPOINT
+unset OTEL_EXPORTER_OTLP_PROTOCOL
+unset OTEL_LOGS_EXPORTER
+unset OTEL_METRICS_EXPORTER
+
 # ── Start Node directly ───────────────────────────────────────────────────────
 echo "🚀 Starting server..."
 cd app
