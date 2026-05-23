@@ -42,6 +42,16 @@ services:
 
       # Anthropic key — powers LLM Observability demo chatbot
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+
+      # PostgreSQL connection
+      PGHOST:     postgres
+      PGPORT:     5432
+      PGDATABASE: inspire_brands
+      PGUSER:     inspire
+      PGPASSWORD: inspire_pw
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       # Live-mount public/ so dd-assets.json updates without rebuild
       - ./app/public:/app/public:ro
@@ -58,6 +68,23 @@ services:
       timeout: 5s
       retries: 3
 
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: inspire-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       inspire_brands
+      POSTGRES_USER:     inspire
+      POSTGRES_PASSWORD: inspire_pw
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inspire -d inspire_brands"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # ── Datadog Private Location ─────────────────────────────────────────────────
   # Runs synthetic tests against http://app:3000 (internal Docker network)
   private-location:
@@ -71,3 +98,6 @@ services:
       - app
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres-data:

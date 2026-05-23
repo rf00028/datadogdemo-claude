@@ -1822,13 +1822,28 @@ async function fireBackgroundOrder(brand) {
   });
 }
 
+// Returns a 0–1 multiplier based on time-of-day to simulate real business hours.
+// Peak lunch (11–14) and dinner (17–21) get full rate; overnight nearly stops.
+function businessHoursMultiplier() {
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  if (h >= 11 && h < 14)  return 1.0;   // lunch rush
+  if (h >= 17 && h < 21)  return 1.0;   // dinner rush
+  if (h >= 8  && h < 11)  return 0.55;  // morning ramp
+  if (h >= 14 && h < 17)  return 0.65;  // mid-afternoon
+  if (h >= 21 && h < 23)  return 0.35;  // evening wind-down
+  if (h >= 7  && h < 8)   return 0.2;   // early open
+  return 0.05;                           // overnight skeleton crew
+}
+
 function scheduleBackgroundTraffic() {
   const { ordersPerBrand, intervalMs } = TRAFFIC_RATES[trafficRate];
   if (ordersPerBrand === 0) return setTimeout(scheduleBackgroundTraffic, 2000);
 
+  const mult = businessHoursMultiplier();
   const fires = [];
   for (const brand of BRAND_KEYS) {
-    const count = ordersPerBrand + Math.floor(Math.random() * 2); // slight jitter
+    const base  = ordersPerBrand * mult;
+    const count = Math.max(1, Math.round(base + (Math.random() * 2 - 1))); // jitter ±1
     for (let i = 0; i < count; i++) {
       fires.push(fireBackgroundOrder(brand));
     }
