@@ -858,6 +858,10 @@ async function initRUM() {
         defaultPrivacyLevel:     'allow',
       });
       DD_RUM.setGlobalContextProperty('brand', brandKey);
+      const _uid = sessionStorage.getItem('dd_demo_uid') || ('user-' + Math.random().toString(36).slice(2, 9));
+      sessionStorage.setItem('dd_demo_uid', _uid);
+      const _tiers = ['Bronze', 'Gold', 'Platinum'];
+      DD_RUM.setUser({ id: _uid, name: 'Demo Customer', tier: _tiers[Math.floor(Math.random() * _tiers.length)] });
       DD_RUM.startSessionReplayRecording();
       DD_RUM.startView({ name: `${brandKey} - menu` });
       const rumUrl = `https://app.datadoghq.com/rum/sessions?query=%40application.id%3A${rumCfg.applicationId}`;

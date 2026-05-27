@@ -26,6 +26,14 @@ const BRANDS = CUSTOMER.brands;
 
 const ASSETS_PATH = path.join(__dirname,'app','public','dd-assets.json');
 
+// Load private location ID so synthetics run inside Docker (not public AWS)
+let PRIVATE_LOCATION_ID = null;
+try {
+  const assets = JSON.parse(fs.readFileSync(ASSETS_PATH, 'utf8'));
+  PRIVATE_LOCATION_ID = assets.privateLocationId || null;
+} catch {}
+const SYNTH_LOCATIONS = PRIVATE_LOCATION_ID ? [PRIVATE_LOCATION_ID] : ['aws:us-east-1'];
+
 function ddRequest(method, urlPath, body, hostname) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
@@ -113,7 +121,7 @@ async function createBrandSynthetics() {
       type: 'api',
       subtype: 'multi',
       status: 'live',
-      locations: ['aws:us-east-1'],
+      locations: SYNTH_LOCATIONS,
       tags: isGlobal
         ? [`service:${SERVICE}`,'env:local',`team:${CUSTOMER.platformTeam}`]
         : [`brand:${s.key}`,`team:${s.brand.team}`,`service:${SERVICE}`,'env:local'],

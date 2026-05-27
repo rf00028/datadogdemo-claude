@@ -7,6 +7,7 @@ const tracer = require('dd-trace').init({
   runtimeMetrics: true,
   profiling: true,
   appsec: process.env.DD_APPSEC_ENABLED !== 'false',
+  dbmPropagationMode: 'full',
 });
 
 const ddTrace = require('dd-trace');
@@ -1031,6 +1032,9 @@ app.post('/api/chat', async (req, res) => {
     dogstatsd.increment('llm.requests',      1, [`brand:${brandTag}`, `app:${CUSTOMER.mlApp}`]);
     dogstatsd.histogram('llm.input_tokens',  usage.input_tokens,  [`brand:${brandTag}`]);
     dogstatsd.histogram('llm.output_tokens', usage.output_tokens, [`brand:${brandTag}`]);
+    // claude-sonnet-4-6 pricing: $3/M input tokens, $15/M output tokens
+    const llmCostUsd = (usage.input_tokens / 1_000_000) * 3.0 + (usage.output_tokens / 1_000_000) * 15.0;
+    dogstatsd.histogram('llm.cost_usd', llmCostUsd, [`brand:${brandTag}`, `app:${CUSTOMER.mlApp}`, `model:claude-sonnet-4-6`]);
 
     logger.info('llm.chat_completion', {
       brand: brandTag, sessionId, mock: !(ANTHROPIC_KEY && Anthropic),
@@ -1942,6 +1946,7 @@ async function startup() {
     client.release();
     dbReady = true;
     console.log('✓ PostgreSQL connected (DBM enabled)');
+    await db.query('CREATE EXTENSION IF NOT EXISTS pg_stat_statements');
     await restoreState();
     setInterval(flushMetricsToDB, 30000);
   } catch (e) {

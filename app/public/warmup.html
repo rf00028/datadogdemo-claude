@@ -30,7 +30,9 @@
     .summary { margin-top: 16px; background: #1e1e2e; border-radius: 10px; padding: 16px; display: none; }
     .summary h2 { font-size: 16px; font-weight: 700; color: #22c55e; margin-bottom: 8px; }
     .summary p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
-    iframe { position: fixed; bottom: -9999px; right: -9999px; width: 390px; height: 844px; border: none; opacity: 0; pointer-events: none; }
+    .preview-wrap { position: fixed; bottom: 16px; right: 16px; z-index: 10; }
+    .preview-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; text-align: center; }
+    iframe { display: block; width: 320px; height: 520px; border: none; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); pointer-events: none; }
   </style>
 </head>
 <body>
@@ -46,7 +48,10 @@
   <p id="summaryText"></p>
 </div>
 
-<iframe id="brandFrame" src="about:blank"></iframe>
+<div class="preview-wrap">
+  <div class="preview-label">Live Preview</div>
+  <iframe id="brandFrame" src="about:blank"></iframe>
+</div>
 
 <script>
 const BRANDS = [
